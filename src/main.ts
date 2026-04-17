@@ -192,6 +192,9 @@ let lastA: bigint | null = null;
 function extractA(): bigint | null { return lastA; }
 
 // ── Main run ─────────────────────────────────────────────────────────────
+const STEP_DELAY = 300;
+function delay(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
+
 async function handleRun(): Promise<void> {
   const raw = parseInt(nInput.value, 10);
   if (isNaN(raw) || raw < 4 || raw > 9999) {
@@ -205,14 +208,20 @@ async function handleRun(): Promise<void> {
   vizPanel.innerHTML = '<p class="viz-panel__placeholder">Computing…</p>';
   runBtn.disabled = true;
 
+  // Collect steps, then render with 300ms delay between each
+  const collectedSteps: ShorStep[] = [];
   const result = await runShor(N, (step: ShorStep) => {
-    // Capture 'a' from random base step
+    collectedSteps.push(step);
+  });
+
+  for (const step of collectedSteps) {
     if (step.label === 'Random base' || step.label === 'Lucky GCD') {
       const data = step.data as { a?: bigint };
       if (data?.a !== undefined) lastA = data.a;
     }
     renderStep(step);
-  });
+    await delay(STEP_DELAY);
+  }
 
   // Result banner
   const banner = document.createElement('div');

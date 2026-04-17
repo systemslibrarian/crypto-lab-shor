@@ -99,12 +99,28 @@ a:hover { text-decoration: underline; }
   gap: 1rem;
 }
 
+/* 320px: single column, presets wrap */
+@media (max-width: 479px) {
+  .controls-bar { flex-direction: column; align-items: stretch; }
+  .presets { justify-content: center; }
+  .n-input { width: 100%; }
+}
+
+/* 768px: Panel B and C side by side */
 @media (min-width: 768px) {
   .panels-bc {
     flex-direction: row;
     align-items: flex-start;
   }
   .panel-b { flex: 1.2; }
+  .panel-c { flex: 1; }
+}
+
+/* 1440px: full three-panel layout */
+@media (min-width: 1440px) {
+  .app-layout { max-width: 1600px; }
+  .panels-bc { gap: 1.5rem; }
+  .panel-b { flex: 1.3; }
   .panel-c { flex: 1; }
 }
 
