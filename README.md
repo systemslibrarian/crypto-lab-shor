@@ -1,70 +1,38 @@
-# crypto-lab-shor — Shor's Algorithm: The Reason Everything Changed
+# crypto-lab-shor
 
-> "Whether therefore ye eat, or drink, or whatsoever ye do, do all to the glory of God."  
-> — 1 Corinthians 10:31
+## What It Is
+
+Shor's algorithm (Peter Shor, 1994) is a quantum algorithm that factors integers in polynomial time O((log N)³), rendering RSA, ECC, and all discrete-logarithm-based cryptosystems insecure against a sufficiently large quantum computer. This demo simulates the complete algorithm — classical pre-checks, modular exponentiation period finding, Quantum Fourier Transform probability distribution, continued fraction extraction, and GCD-based factor recovery — entirely in the browser with no backends. The security model it breaks is asymmetric public-key cryptography; it does not threaten symmetric ciphers or hash functions beyond Grover's quadratic speedup.
+
+## When to Use It
+
+- **Understanding why RSA and ECC break** — the demo walks through the period-finding insight that connects modular arithmetic to quantum phase estimation, making the threat concrete rather than abstract.
+- **Teaching the QFT-to-period pipeline** — students can see the QFT probability distribution peaks, the continued fraction convergents, and the a^r ≡ 1 (mod N) verification step by step.
+- **Comparing classical vs. quantum factoring complexity** — the built-in RSA Impact panel shows the exponential-to-polynomial gap between GNFS and Shor for real key sizes.
+- **Motivating post-quantum migration** — the resource requirements table shows how close (or far) current quantum hardware is from breaking RSA-2048 and ECC P-256.
+- **Do NOT use this as a real factoring tool** — the browser simulation handles N < 10,000; real quantum advantage requires fault-tolerant quantum hardware that does not yet exist at the required scale.
 
 ## Live Demo
 
 **https://systemslibrarian.github.io/crypto-lab-shor/**
 
-## What It Is
+Enter any composite integer N (4–9999), pick a preset, or type your own. Press **Run Shor's Algorithm** to watch the four-stage pipeline execute with animated step logs, a period table bar chart, QFT probability distribution visualization, and continued fraction convergent table. The RSA Impact panel shows factoring complexity comparisons and quantum resource estimates for real-world key sizes.
 
-Browser-based simulation of Shor's quantum factoring algorithm (Peter Shor,
-1994) — the algorithm that made post-quantum cryptography necessary. Every
-NIST post-quantum standard exists because of what this algorithm proved: that
-a sufficiently large quantum computer can factor any integer in polynomial
-time O((log N)³), compared to the sub-exponential classical best.
+## How to Run Locally
 
-Simulates the complete four-step algorithm with full step-by-step tracing:
-classical pre-checks, period finding via modular exponentiation (with period
-table visualization for small N), Quantum Fourier Transform probability
-distribution (analytically computed), continued fraction extraction of the
-period, and classical factor recovery. All quantum steps are clearly labeled
-as classically simulated. No backends. No simulated shortcuts — the number
-theory is real.
+```bash
+git clone https://github.com/systemslibrarian/crypto-lab-shor
+cd crypto-lab-shor
+npm install
+npm run dev
+```
 
-## When to Use It
+## Part of the Crypto-Lab Suite
 
-- Understanding **WHY** RSA breaks — not just that quantum computers threaten it
-- Seeing the period-finding insight that connects modular arithmetic to QFT
-- Teaching the continued fraction step that converts a QFT measurement to a period
-- Comparing the complexity gap between classical GNFS and Shor's algorithm
-- Understanding that Shor also breaks ECC and Diffie-Hellman via discrete log
+> One of 60+ live browser demos at
+> [systemslibrarian.github.io/crypto-lab](https://systemslibrarian.github.io/crypto-lab/)
+> — spanning Atbash (600 BCE) through NIST FIPS 203/204/205 (2024).
 
-## What It Does
+---
 
-The demo runs the four steps of Shor's algorithm with animated, step-by-step output:
-
-1. **Classical pre-checks** — detects trivial cases (even N, perfect powers, lucky GCD)
-2. **Order finding** — for N ≤ 1000: shows the full period table f(x) = aˣ mod N; for N > 1000: uses QFT probability distribution simulation
-3. **Continued fraction extraction** — converts the QFT measurement phase to the period r
-4. **Factor extraction** — computes gcd(a^(r/2) ± 1, N)
-
-The qubit count display reflects the actual resource requirement: `3·⌈log₂N⌉ + 3` logical qubits.
-
-## What Can Go Wrong
-
-- **Bad choice of a:** If a^(r/2) ≡ -1 (mod N) or r is odd, the attempt fails and the algorithm retries with a different a. This happens with probability ≤ 1/2 per attempt — on average 2 attempts suffice.
-- **QFT measurement miss:** The QFT peaks at k·Q/r, but a wrong k can produce a convergent that doesn't satisfy a^r ≡ 1 (mod N). The algorithm retries. In the demo this is shown explicitly.
-- **N = p (prime):** Shor's algorithm does not factor primes. The algorithm detects this via failed order finding. Use a semiprime as input.
-- **Classical simulation limits:** The browser simulation runs in polynomial time for N < 10,000. For larger N the QFT distribution is computed analytically. Real quantum advantage requires actual quantum hardware.
-
-## Real-World Usage
-
-As of 2026, the largest fault-tolerant quantum demonstrations have factored
-numbers with ~10 bits. RSA-2048 requires ~4,100 logical qubits (Gidney, 2025
-estimate). ECC P-256 requires ~2,330 logical qubits (Google, 2026 whitepaper).
-Neither is achievable with current hardware. The "harvest now, decrypt later"
-threat is real regardless: adversaries collecting RSA-encrypted data today
-can decrypt it once sufficient quantum hardware exists.
-
-Migration path: NIST FIPS 203 (ML-KEM), FIPS 204 (ML-DSA), FIPS 205 (SLH-DSA).
-
-## Stack
-
-Vite + TypeScript strict + vanilla CSS. No external libraries. WebCrypto for randomness only. GitHub Pages deployment.
-
-## Related
-
-- [crypto-lab-kyber-vault](https://systemslibrarian.github.io/crypto-lab-kyber-vault/) — post-quantum replacement (ML-KEM)
-- [crypto-lab-bb84](https://systemslibrarian.github.io/crypto-lab-bb84/) — physics-based alternative (QKD)
+*"Whether you eat or drink, or whatever you do, do all to the glory of God." — 1 Corinthians 10:31*
