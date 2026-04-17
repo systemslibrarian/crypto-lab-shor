@@ -11,7 +11,165 @@
     </script>
   </head>
   <body>
-    <div id="app"></div>
+    <header class="site-header">
+      <div class="site-header__title">
+        <span class="site-header__logo">⟨ψ|</span>
+        <span class="site-header__name">crypto-lab-shor</span>
+        <span class="site-header__subtitle">Shor's Algorithm — The Reason Everything Changed</span>
+      </div>
+      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark/light theme">🌙</button>
+    </header>
+
+    <main class="app-layout">
+
+      <!-- ── Controls ──────────────────────────────────────────────── -->
+      <section class="controls-bar" aria-label="Algorithm controls">
+        <label class="input-label" for="n-input">Factor N:</label>
+        <input
+          id="n-input"
+          type="number"
+          value="15"
+          min="4"
+          max="9999"
+          class="n-input"
+          aria-label="Integer N to factor"
+        />
+        <div class="presets" role="group" aria-label="Preset values">
+          <span class="presets__label">Presets:</span>
+          <button class="preset-btn" data-n="15">15</button>
+          <button class="preset-btn" data-n="21">21</button>
+          <button class="preset-btn" data-n="35">35</button>
+          <button class="preset-btn" data-n="77">77</button>
+          <button class="preset-btn" data-n="91">91</button>
+          <button class="preset-btn" data-n="143">143</button>
+          <button class="preset-btn" data-n="221">221</button>
+        </div>
+        <button id="run-btn" class="run-btn" aria-label="Run Shor's Algorithm">▶ Run Shor's Algorithm</button>
+        <button id="reset-btn" class="reset-btn" aria-label="Reset">Reset</button>
+      </section>
+
+      <!-- ── Panel A — Algorithm Steps ─────────────────────────────── -->
+      <section class="panel panel-a" aria-label="Algorithm step log">
+        <div class="panel__header">ALGORITHM STEPS</div>
+        <div
+          id="step-log"
+          class="step-log"
+          aria-live="polite"
+          aria-label="Algorithm step log"
+          tabindex="0"
+        >
+          <p class="step-log__placeholder">Enter N and press ▶ Run Shor's Algorithm to begin.</p>
+        </div>
+      </section>
+
+      <!-- ── Panels B + C ───────────────────────────────────────────── -->
+      <div class="panels-bc">
+
+        <!-- Panel B — Visualization -->
+        <section class="panel panel-b" aria-label="Period table and QFT visualization">
+          <div class="panel__header">PERIOD TABLE / QFT VISUALIZATION</div>
+          <div id="viz-panel" class="viz-panel">
+            <p class="viz-panel__placeholder">Visualization will appear here after running the algorithm.</p>
+          </div>
+        </section>
+
+        <!-- Panel C — RSA Impact -->
+        <section class="panel panel-c" aria-label="RSA impact calculator">
+          <div class="panel__header">RSA IMPACT</div>
+          <div class="rsa-impact">
+
+            <h3 class="rsa-impact__section-title">FACTORING COMPLEXITY (log scale)</h3>
+            <div class="complexity-chart" role="img" aria-label="Comparison of classical GNFS and quantum Shor algorithm complexity on a logarithmic scale">
+              <div class="complexity-row">
+                <span class="complexity-label">Classical (GNFS)</span>
+                <div class="complexity-bar complexity-bar--classical" style="width:100%"></div>
+                <span class="complexity-formula">exp(O((log N)<sup>1/3</sup>))</span>
+              </div>
+              <div class="complexity-row">
+                <span class="complexity-label">Quantum (Shor)</span>
+                <div class="complexity-bar complexity-bar--quantum" style="width:25%"></div>
+                <span class="complexity-formula">O((log N)<sup>3</sup>)</span>
+              </div>
+              <p class="complexity-note">At RSA-2048: Classical ≈ 10<sup>23</sup> ops | Quantum ≈ 10<sup>9</sup> ops<br>
+              Speedup: ~10<sup>14</sup>× — fourteen orders of magnitude</p>
+            </div>
+
+            <h3 class="rsa-impact__section-title">RESOURCE REQUIREMENTS</h3>
+            <div class="resource-table-wrapper" role="img" aria-label="Quantum resource requirements table for various cryptographic targets">
+              <table class="resource-table">
+                <thead>
+                  <tr>
+                    <th>Target</th>
+                    <th>Logical Qubits</th>
+                    <th>Physical Qubits (est.)</th>
+                    <th>Threat Timeline</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="row--broken">
+                    <td>RSA-512</td><td>~1,500</td><td>~500K</td><td>Already broken classically</td>
+                  </tr>
+                  <tr class="row--threat">
+                    <td>RSA-2048</td><td>~4,100</td><td>&lt;1M (Gidney, 2025)</td><td>10–25 years</td>
+                  </tr>
+                  <tr class="row--threat">
+                    <td>RSA-4096</td><td>~8,200</td><td>~2M</td><td>15–30 years</td>
+                  </tr>
+                  <tr class="row--threat">
+                    <td>ECC P-256</td><td>~2,330</td><td>&lt;500K (Google, 2026)</td><td>10–20 years</td>
+                  </tr>
+                  <tr class="row--threat">
+                    <td>ECC P-384</td><td>~3,500</td><td>~750K</td><td>15–25 years</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="resource-note">Current largest fault-tolerant quantum computers: ~1,000 logical qubits (2026)<br>
+              Gap to RSA-2048: ~4,100 logical qubits needed</p>
+            </div>
+
+            <details class="ecc-detail">
+              <summary class="ecc-detail__summary">▶ Why Shor breaks ECC too</summary>
+              <div class="ecc-detail__body">
+                <p>Shor's algorithm also solves the <strong>discrete logarithm problem</strong> — the mathematical foundation of ECC and Diffie-Hellman.</p>
+                <div class="ecc-comparison">
+                  <div>ECC P-256 security (classical): 2<sup>128</sup> operations</div>
+                  <div class="ecc-quantum">ECC P-256 security (quantum): ~2<sup>0</sup> — broken in polynomial time</div>
+                </div>
+                <p>ECDH, ECDSA, and all ECC-based protocols are equally vulnerable. Smaller key sizes make ECC <em>faster</em> to break than RSA on a quantum computer.</p>
+              </div>
+            </details>
+
+            <h3 class="rsa-impact__section-title">QUANTUM-RESISTANT AFTER SHOR</h3>
+            <ul class="survivor-list">
+              <li class="survivor--safe">✓ AES-256 — Grover reduces to 128-bit effective — still strong</li>
+              <li class="survivor--safe">✓ SHA-3 — Grover reduces collision resistance — still usable</li>
+              <li class="survivor--safe">✓ ML-KEM (Kyber) — Lattice problems — no known quantum speedup</li>
+              <li class="survivor--safe">✓ ML-DSA — Lattice problems — no known quantum speedup</li>
+              <li class="survivor--safe">✓ SLH-DSA — Hash-based — quantum-safe by design</li>
+              <li class="survivor--safe">✓ BB84 QKD — Physics-based — immune to all computational attacks</li>
+              <li class="survivor--broken">✗ RSA (any size) — Broken by Shor</li>
+              <li class="survivor--broken">✗ ECC (any curve) — Broken by Shor</li>
+              <li class="survivor--broken">✗ Diffie-Hellman — Broken by Shor</li>
+            </ul>
+
+            <div id="live-callout" class="live-callout">
+              <p>Run the algorithm above to see a live demo.</p>
+              <p class="live-callout__links">
+                → <a href="https://systemslibrarian.github.io/crypto-lab-kyber-vault/" target="_blank" rel="noopener">crypto-lab-kyber-vault</a> — post-quantum replacement<br>
+                → <a href="https://systemslibrarian.github.io/crypto-lab-bb84/" target="_blank" rel="noopener">crypto-lab-bb84</a> — physics-based alternative
+              </p>
+            </div>
+
+          </div>
+        </section>
+
+      </div><!-- /panels-bc -->
+    </main>
+
+    <footer class="scripture-footer">
+      <p>"Whether therefore ye eat, or drink, or whatsoever ye do, do all to the glory of God." — 1 Corinthians 10:31</p>
+    </footer>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
