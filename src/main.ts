@@ -7,13 +7,14 @@ const themeBtn = document.getElementById('theme-toggle') as HTMLButtonElement;
 function applyTheme(t: string) {
   document.documentElement.setAttribute('data-theme', t);
   themeBtn.textContent = t === 'dark' ? '🌙' : '☀️';
-  localStorage.setItem('cv-theme', t);
+  themeBtn.setAttribute('aria-label', t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+  localStorage.setItem('theme', t);
 }
 themeBtn.addEventListener('click', () => {
   const current = document.documentElement.getAttribute('data-theme') ?? 'dark';
   applyTheme(current === 'dark' ? 'light' : 'dark');
 });
-applyTheme(localStorage.getItem('cv-theme') ?? 'dark');
+applyTheme(localStorage.getItem('theme') ?? 'dark');
 
 // ── DOM refs ─────────────────────────────────────────────────────────────
 const nInput   = document.getElementById('n-input')   as HTMLInputElement;

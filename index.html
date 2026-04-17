@@ -6,8 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Shor's Algorithm — crypto-lab</title>
     <script>
-      const t = localStorage.getItem('cv-theme') || 'dark';
-      document.documentElement.setAttribute('data-theme', t);
+      (function () {
+        const saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved ?? 'dark');
+      })();
     </script>
   </head>
   <body>
@@ -17,7 +19,7 @@
         <span class="site-header__name">crypto-lab-shor</span>
         <span class="site-header__subtitle">Shor's Algorithm — The Reason Everything Changed</span>
       </div>
-      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark/light theme">🌙</button>
+      <button id="theme-toggle" class="theme-toggle" style="position: absolute; top: 0; right: 0" aria-label="Switch to light mode">🌙</button>
     </header>
 
     <main class="app-layout">
