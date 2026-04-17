@@ -79,9 +79,9 @@ export function computeQFTDistribution(
  * Sample a measurement outcome m from the QFT distribution.
  * Uses crypto.getRandomValues for weighted sampling.
  */
-export async function sampleQFTMeasurement(
+export function sampleQFTMeasurement(
   distribution: Array<{ m: number; probability: number }>
-): Promise<number> {
+): number {
   // Build CDF
   let cumulative = 0;
   const cdf: Array<{ m: number; threshold: number }> = distribution.map(item => {
