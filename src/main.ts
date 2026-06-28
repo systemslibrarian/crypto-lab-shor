@@ -16,17 +16,29 @@ themeBtn.addEventListener('click', () => {
 });
 applyTheme(localStorage.getItem('theme') ?? 'dark');
 
+// Respect users who prefer reduced motion (vestibular safety / ADA).
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 // ── DOM refs ─────────────────────────────────────────────────────────────
 const nInput   = document.getElementById('n-input')   as HTMLInputElement;
 const runBtn   = document.getElementById('run-btn')   as HTMLButtonElement;
 const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 const stepLog  = document.getElementById('step-log')  as HTMLDivElement;
 const vizPanel = document.getElementById('viz-panel') as HTMLDivElement;
+const nError   = document.getElementById('n-error')   as HTMLParagraphElement;
 const liveCallout = document.getElementById('live-callout') as HTMLDivElement;
+
+// ── Run state ────────────────────────────────────────────────────────────
+// `isRunning` blocks re-entry from every trigger (Run button, Enter, presets),
+// not just the Run button's disabled state. `runToken` is bumped to cancel an
+// in-flight run (e.g. on Reset) so its async replay loop bails out cleanly.
+let isRunning = false;
+let runToken = 0;
 
 // ── Preset buttons ───────────────────────────────────────────────────────
 document.querySelectorAll<HTMLButtonElement>('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (isRunning) return;
     nInput.value = btn.dataset['n'] ?? '15';
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
@@ -45,7 +57,7 @@ function classifyStep(label: string): { tag: string; cssClass: string } {
 }
 
 // ── Render one step ──────────────────────────────────────────────────────
-function renderStep(step: ShorStep): void {
+function renderStep(step: ShorStep, N: bigint): void {
   const { tag, cssClass } = classifyStep(step.label);
   const entry = document.createElement('div');
   entry.className = `step-entry ${cssClass}`;
@@ -81,7 +93,7 @@ function renderStep(step: ShorStep): void {
   stepLog.scrollTop = stepLog.scrollHeight;
 
   // Render panel B data
-  renderViz(step);
+  renderViz(step, N);
 }
 
 // ── Panel B visualizations ───────────────────────────────────────────────
@@ -102,29 +114,34 @@ function getVizSection(id: string, title: string): HTMLElement {
   return section;
 }
 
-function renderViz(step: ShorStep): void {
+function renderViz(step: ShorStep, N: bigint): void {
   if (step.label === 'Period table') {
     const data = step.data as { table: Array<{x:number; fx:number}>; period: number; a: number; N: number };
     const sec = getVizSection('period', `f(x) = ${data.a}^x mod ${data.N}  —  period r = ${data.period}`);
     const container = document.createElement('div');
     container.className = 'period-bars';
+    // The chart is a single labelled image; the container is keyboard-focusable
+    // so it can be scrolled with the arrow keys (WCAG 2.1.1). Individual bars are
+    // decorative (their data is in the title tooltip + the label), not focusable.
     container.setAttribute('role', 'img');
-    container.setAttribute('aria-label', `Period table for f(x) = ${data.a}^x mod ${data.N}. Period r = ${data.period}`);
+    container.setAttribute('tabindex', '0');
+    container.setAttribute('aria-label',
+      `Bar chart: f(x) = ${data.a}^x mod ${data.N} for x = 0 to ${data.table.length - 1}. The values repeat with period r = ${data.period}.`);
     const maxFx = Math.max(...data.table.map(d => d.fx), 1);
     data.table.forEach((row, i) => {
       const bar = document.createElement('div');
       bar.className = 'period-bar';
       const heightPct = Math.max(4, Math.round((row.fx / maxFx) * 100));
       bar.style.height = heightPct + '%';
-      bar.setAttribute('tabindex', '0');
-      bar.setAttribute('aria-label', `x=${row.x}, f(x)=${row.fx}`);
       bar.title = `x=${row.x}  f(x)=${row.fx}`;
       if (row.fx === 1 && i > 0) bar.classList.add('period-bar--period');
       container.appendChild(bar);
 
-      // Animate bars in one by one
-      bar.style.opacity = '0';
-      setTimeout(() => { bar.style.opacity = '1'; bar.style.transition = 'opacity 0.2s'; }, i * 50);
+      // Animate bars in one by one (skipped when reduced motion is requested)
+      if (!reduceMotion) {
+        bar.style.opacity = '0';
+        setTimeout(() => { bar.style.opacity = '1'; bar.style.transition = 'opacity 0.2s'; }, i * 50);
+      }
     });
     sec.appendChild(container);
   }
@@ -134,8 +151,10 @@ function renderViz(step: ShorStep): void {
     const sec = getVizSection('qft', `QFT probability distribution  (classically simulated)  —  Q = ${data.Q},  r = ${data.r}`);
     const wrapper = document.createElement('div');
     wrapper.className = 'qft-bars-wrapper';
+    // Focusable so keyboard users can scroll the chart (WCAG 2.1.1).
     wrapper.setAttribute('role', 'img');
-    wrapper.setAttribute('aria-label', `QFT probability distribution. Peaks at multiples of Q/r = ${Math.round(data.Q / data.r)}. Sampled m = ${data.measured}.`);
+    wrapper.setAttribute('tabindex', '0');
+    wrapper.setAttribute('aria-label', `Bar chart of the QFT measurement probability distribution. It peaks at multiples of Q/r ≈ ${Math.round(data.Q / data.r)}. The sampled measurement was m = ${data.measured}.`);
     const barsDiv = document.createElement('div');
     barsDiv.className = 'qft-bars';
     const maxP = Math.max(...data.distribution.map(d => d.probability), 0.001);
@@ -148,8 +167,10 @@ function renderViz(step: ShorStep): void {
       bar.style.height = h + 'px';
       bar.style.width = '8px';
       bar.title = `m=${item.m}  p=${item.probability.toFixed(4)}${item.peak ? ' (peak)' : ''}`;
-      bar.style.opacity = '0';
-      setTimeout(() => { bar.style.opacity = '1'; bar.style.transition = 'opacity 0.15s'; }, i * 30);
+      if (!reduceMotion) {
+        bar.style.opacity = '0';
+        setTimeout(() => { bar.style.opacity = '1'; bar.style.transition = 'opacity 0.15s'; }, i * 30);
+      }
       barsDiv.appendChild(bar);
     });
     wrapper.appendChild(barsDiv);
@@ -162,12 +183,16 @@ function renderViz(step: ShorStep): void {
 
   if (step.label === 'Continued fractions') {
     const data = step.data as { convergents: Array<{num:bigint; den:bigint}>; chosenR: bigint; m: number|bigint; Q: bigint };
-    const N = BigInt((document.getElementById('n-input') as HTMLInputElement).value);
     const a = extractA();
     const sec = getVizSection('cf', `Continued Fraction Extraction  —  phase ${data.m} / ${data.Q}`);
+    const tableWrap = document.createElement('div');
+    tableWrap.className = 'table-scroll';
+    tableWrap.setAttribute('tabindex', '0');
+    tableWrap.setAttribute('role', 'region');
+    tableWrap.setAttribute('aria-label', `Continued fraction convergents of ${data.m}/${data.Q}`);
     const table = document.createElement('table');
     table.className = 'convergents';
-    table.innerHTML = '<thead><tr><th>Convergent</th><th>Fraction</th><th>Test: a^r ≡ 1 mod N?</th></tr></thead>';
+    table.innerHTML = '<caption class="sr-only">Continued fraction convergents and whether each denominator is the period</caption><thead><tr><th scope="col">Convergent</th><th scope="col">Fraction</th><th scope="col">Test: a^r ≡ 1 mod N?</th></tr></thead>';
     const tbody = document.createElement('tbody');
     data.convergents.forEach((conv, i) => {
       const tr = document.createElement('tr');
@@ -184,7 +209,8 @@ function renderViz(step: ShorStep): void {
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    sec.appendChild(table);
+    tableWrap.appendChild(table);
+    sec.appendChild(tableWrap);
   }
 }
 
@@ -196,47 +222,79 @@ function extractA(): bigint | null { return lastA; }
 const STEP_DELAY = 300;
 function delay(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
 
+function setError(msg: string): void {
+  nError.textContent = msg;
+  nError.hidden = msg === '';
+  nInput.setAttribute('aria-invalid', msg ? 'true' : 'false');
+}
+
 async function handleRun(): Promise<void> {
+  if (isRunning) return; // ignore re-entrant triggers (Run, Enter, presets)
   const raw = parseInt(nInput.value, 10);
   if (isNaN(raw) || raw < 4 || raw > 9999) {
-    alert('Please enter N between 4 and 9999.');
+    setError('Please enter a whole number N between 4 and 9999.');
+    nInput.focus();
     return;
   }
+  setError('');
   const N = BigInt(raw);
+  const myToken = ++runToken;
+  isRunning = true;
   lastA = null;
   vizSections = {};
   stepLog.innerHTML = `<div style="color:var(--text-dim);margin-bottom:0.5rem">━━━ SHOR'S ALGORITHM: N = ${N} ━━━</div>`;
   vizPanel.innerHTML = '<p class="viz-panel__placeholder">Computing…</p>';
   runBtn.disabled = true;
 
-  // Collect steps, then render with 300ms delay between each
-  const collectedSteps: ShorStep[] = [];
-  const result = await runShor(N, (step: ShorStep) => {
-    collectedSteps.push(step);
-  });
+  try {
+    // Collect steps, then render with 300ms delay between each
+    const collectedSteps: ShorStep[] = [];
+    const result = await runShor(N, (step: ShorStep) => {
+      collectedSteps.push(step);
+    });
+    if (myToken !== runToken) return; // cancelled (e.g. Reset) during compute
 
-  for (const step of collectedSteps) {
-    if (step.label === 'Random base' || step.label === 'Lucky GCD') {
-      const data = step.data as { a?: bigint };
-      if (data?.a !== undefined) lastA = data.a;
+    for (const step of collectedSteps) {
+      if (myToken !== runToken) return; // cancelled mid-replay
+      if (step.label === 'Random base' || step.label === 'Lucky GCD') {
+        const data = step.data as { a?: bigint };
+        if (data?.a !== undefined) lastA = data.a;
+      }
+      renderStep(step, N);
+      await delay(STEP_DELAY);
     }
-    renderStep(step);
-    await delay(STEP_DELAY);
-  }
+    if (myToken !== runToken) return;
 
-  // Result banner
-  const banner = document.createElement('div');
-  if (result.factors) {
-    banner.className = 'result-banner';
-    banner.textContent = `━━━ RESULT: ${N} = ${result.factors[0]} × ${result.factors[1]}  |  Attempts: ${result.attempts}  |  Time: ${Math.round(result.totalTime)}ms ━━━`;
-    updateCallout(N, result.factors);
-  } else {
-    banner.className = 'result-banner result-banner--fail';
-    banner.textContent = `━━━ No factors found after ${result.attempts} attempts ━━━`;
+    // Result banner
+    const banner = document.createElement('div');
+    if (result.factors) {
+      banner.className = 'result-banner';
+      banner.textContent = `━━━ RESULT: ${N} = ${result.factors[0]} × ${result.factors[1]}  |  Attempts: ${result.attempts}  |  Time: ${Math.round(result.totalTime)}ms ━━━`;
+      updateCallout(N, result.factors);
+    } else if (result.note) {
+      banner.className = 'result-banner result-banner--info';
+      banner.textContent = `━━━ ${result.note} ━━━`;
+    } else {
+      banner.className = 'result-banner result-banner--fail';
+      banner.textContent = `━━━ No factors found after ${result.attempts} attempts ━━━`;
+    }
+    stepLog.appendChild(banner);
+    stepLog.scrollTop = stepLog.scrollHeight;
+
+    // If N was resolved classically (even / perfect power / prime / too small),
+    // no QFT visualization is produced — replace the "Computing…" placeholder.
+    if (Object.keys(vizSections).length === 0) {
+      vizPanel.innerHTML =
+        '<p class="viz-panel__placeholder">N was resolved classically — no quantum order-finding was needed, so there is no QFT visualization for this input.</p>';
+    }
+  } finally {
+    // Only clear state if this run is still the current one; a newer run or a
+    // Reset (which bumped runToken) owns the button/flag now.
+    if (myToken === runToken) {
+      runBtn.disabled = false;
+      isRunning = false;
+    }
   }
-  stepLog.appendChild(banner);
-  stepLog.scrollTop = stepLog.scrollHeight;
-  runBtn.disabled = false;
 }
 
 function updateCallout(N: bigint, factors: [bigint, bigint]): void {
@@ -251,13 +309,18 @@ function updateCallout(N: bigint, factors: [bigint, bigint]): void {
 
 // ── Reset ────────────────────────────────────────────────────────────────
 resetBtn.addEventListener('click', () => {
+  runToken++;          // cancel any in-flight run's replay loop
+  isRunning = false;
   stepLog.innerHTML = '<p class="step-log__placeholder">Enter N and press ▶ Run Shor\'s Algorithm to begin.</p>';
   vizPanel.innerHTML = '<p class="viz-panel__placeholder">Visualization will appear here after running the algorithm.</p>';
   vizSections = {};
   lastA = null;
   runBtn.disabled = false;
+  setError('');
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
 });
 
+nInput.addEventListener('input', () => setError(''));
+nInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleRun(); });
 runBtn.addEventListener('click', handleRun);
 

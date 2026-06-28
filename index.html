@@ -147,11 +147,13 @@
         <input
           id="n-input"
           type="number"
+          inputmode="numeric"
           value="15"
           min="4"
           max="9999"
           class="n-input"
-          aria-label="Integer N to factor"
+          aria-label="Integer N to factor, between 4 and 9999"
+          aria-describedby="n-error"
         />
         <div class="presets" role="group" aria-label="Preset values">
           <span class="presets__label">Presets:</span>
@@ -165,6 +167,7 @@
         </div>
         <button id="run-btn" class="run-btn" aria-label="Run Shor's Algorithm">▶ Run Shor's Algorithm</button>
         <button id="reset-btn" class="reset-btn" aria-label="Reset">Reset</button>
+        <p id="n-error" class="input-error" role="alert" hidden></p>
       </section>
 
       <!-- ── Panel A — Algorithm Steps ─────────────────────────────── -->
@@ -214,7 +217,7 @@
             </div>
 
             <h3 class="rsa-impact__section-title">RESOURCE REQUIREMENTS</h3>
-            <div class="resource-table-wrapper" role="img" aria-label="Quantum resource requirements table for various cryptographic targets">
+            <div class="resource-table-wrapper" tabindex="0" role="region" aria-label="Quantum resource requirements table for various cryptographic targets">
               <table class="resource-table">
                 <thead>
                   <tr>

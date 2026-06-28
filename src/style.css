@@ -31,7 +31,9 @@
   --text-dim: #57606a;
   --text-bright: #0d1117;
   --quantum: #0550ae;
-  --classical: #9a6700;
+  /* Dark enough to clear 4.5:1 as text on the light panel background; the
+     active/hover state pairs it with white text (see overrides below). */
+  --classical: #6b4800;
   --success: #1a7f37;
   --failure: #cf222e;
   --peak: #8250df;
@@ -39,6 +41,13 @@
   --glow-s: none;
   --glow-p: none;
 }
+
+/* Light theme: these accents are too light for black text — use white so the
+   buttons clear WCAG AA (4.5:1). Dark theme uses bright accents where black
+   text is already high-contrast, so it keeps the default. */
+[data-theme="light"] .run-btn { color: #fff; }
+[data-theme="light"] .preset-btn:hover,
+[data-theme="light"] .preset-btn.active { color: #fff; }
 
 html { font-size: 14px; }
 
@@ -147,12 +156,32 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border);
   color: var(--text-bright);
   border-radius: var(--radius);
-  padding: 0.3rem 0.6rem;
+  padding: 0.4rem 0.6rem;
   font-family: var(--font);
-  font-size: 1rem;
+  /* 16px minimum prevents iOS Safari from auto-zooming the page on focus. */
+  font-size: 16px;
   width: 7rem;
 }
-.n-input:focus { outline: 2px solid var(--quantum); }
+.n-input:focus-visible { outline: 2px solid var(--quantum); outline-offset: 1px; }
+.n-input[aria-invalid="true"] { border-color: var(--failure); }
+
+/* Validation message — announced via role="alert" in the markup. */
+.input-error {
+  flex-basis: 100%;
+  color: var(--failure);
+  font-size: 0.85rem;
+  margin: 0;
+}
+.input-error[hidden] { display: none; }
+
+/* Visually hidden but available to screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
 
 .presets { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .presets__label { color: var(--text-dim); font-size: 0.85rem; }
@@ -196,6 +225,34 @@ a:hover { text-decoration: underline; }
   font-size: 0.85rem;
 }
 .reset-btn:hover { border-color: var(--failure); color: var(--failure); }
+
+/* ── Focus & touch targets (a11y) ──────────────────────────────────────── */
+/* Consistent, visible keyboard focus on every interactive control. */
+.preset-btn:focus-visible,
+.run-btn:focus-visible,
+.reset-btn:focus-visible,
+.theme-toggle:focus-visible,
+.ecc-detail__summary:focus-visible,
+.period-bars:focus-visible,
+.qft-bars-wrapper:focus-visible,
+.resource-table-wrapper:focus-visible,
+.table-scroll:focus-visible,
+.step-log:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--quantum);
+  outline-offset: 2px;
+}
+
+/* Comfortable tap targets on touch devices without bulking up the mouse UI. */
+@media (pointer: coarse) {
+  .preset-btn, .run-btn, .reset-btn, .n-input { min-height: 44px; }
+  .preset-btn { min-width: 44px; padding-inline: 0.75rem; }
+  .ecc-detail__summary { min-height: 44px; padding: 0.85rem 0.75rem; display: flex; align-items: center; }
+}
+
+/* Horizontally scrollable wrappers (charts, tables) — focusable in the markup
+   so keyboard users can pan them; this gives the focus ring something to hug. */
+.table-scroll { overflow-x: auto; }
 
 /* ── Panel shell ───────────────────────────────────────────────────────── */
 .panel {
@@ -257,6 +314,12 @@ a:hover { text-decoration: underline; }
   border-color: var(--failure);
   background: rgba(255, 51, 102, 0.05);
   color: var(--failure);
+  text-shadow: none;
+}
+.result-banner--info {
+  border-color: var(--classical);
+  background: rgba(255, 215, 0, 0.05);
+  color: var(--classical);
   text-shadow: none;
 }
 
@@ -376,6 +439,17 @@ a:hover { text-decoration: underline; }
 }
 .live-callout p { margin-bottom: 0.4rem; }
 .live-callout p:last-child { margin-bottom: 0; }
+
+/* ── Reduced motion (ADA / vestibular safety) ──────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .qft-bar--sampled { animation: none; }
+}
 
 /* ── Footer ────────────────────────────────────────────────────────────── */
 .scripture-footer {
