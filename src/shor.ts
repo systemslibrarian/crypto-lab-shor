@@ -2,15 +2,19 @@
  * Shor's Algorithm Engine
  *
  * Implements the complete four-step algorithm with full step-by-step tracing.
- * For N <= 1000: classicalOrderFind is used for order finding (toy mode).
- * For N > 1000: QFT probability distribution simulation is used.
  *
- * All quantum steps are classically simulated and labeled as such.
+ * Order finding (the only step a real quantum computer performs) is simulated
+ * classically: for the demo's range (N < 10,000) the true period r is found by
+ * direct search, then the quantum measurement is modelled by sampling from the
+ * ideal QFT probability distribution, which peaks at m = k·Q/r. Continued
+ * fractions then recover r from the sampled m — exactly the post-processing a
+ * real Shor run performs. Every quantum step is clearly labelled as simulated.
  */
 
 import {
   gcd,
   modPow,
+  isPrime,
   checkPerfectPower,
   classicalOrderFind,
   continuedFractionConvergents,
@@ -31,6 +35,8 @@ export interface ShorResult {
   steps: ShorStep[];
   attempts: number;
   totalTime: number; // ms
+  /** Set when there is no factorisation to find (e.g. N is prime or too small). */
+  note?: string;
 }
 
 /**
@@ -90,7 +96,7 @@ export async function runShor(
 
   if (N < 4n) {
     emit({ label: 'Pre-check', description: `N = ${N} is too small. Shor's algorithm requires N ≥ 4.`, data: null, success: false });
-    return { N, factors: null, steps, attempts: 0, totalTime: performance.now() - startTime };
+    return { N, factors: null, steps, attempts: 0, totalTime: performance.now() - startTime, note: `N = ${N} is too small to factor (need N ≥ 4).` };
   }
 
   if (N % 2n === 0n) {
@@ -111,16 +117,25 @@ export async function runShor(
     return { N, factors: fb, steps, attempts: 0, totalTime: performance.now() - startTime };
   }
 
+  if (isPrime(N)) {
+    emit({
+      label: 'Prime input',
+      description: `N = ${N} is prime. Shor's algorithm factors composite numbers — a prime has no non-trivial factors to find. Try a composite N (e.g. a product of two primes).`,
+      data: { prime: true },
+      success: false
+    });
+    return { N, factors: null, steps, attempts: 0, totalTime: performance.now() - startTime, note: `N = ${N} is prime — there is nothing to factor.` };
+  }
+
   emit({
     label: 'Pre-check',
-    description: `N = ${N} is odd, not a perfect power, and ≥ 4. Proceeding to quantum order finding.`,
+    description: `N = ${N} is odd, composite, not a perfect power, and ≥ 4. Proceeding to quantum order finding.`,
     data: { N },
     success: true
   });
 
   // ── Steps 2–4: Loop with retries ─────────────────────────────────────────
 
-  const toyMode = N <= 1000n;
   const L = ceilLog2(N);
   const Q = 1 << (2 * L); // Q = 2^(2L) — as a regular number (safe for L <= 14)
   const Qn = BigInt(Q);
@@ -162,113 +177,70 @@ export async function runShor(
       success: true
     });
 
-    // ── Order finding ─────────────────────────────────────────────────────
+    // ── Order finding (simulated quantum subroutine) ──────────────────────
+    // The period r is the only thing a real quantum computer would extract.
+    // We find the true r by direct search (fast for N < 10,000), then model
+    // the quantum measurement faithfully below.
 
-    let r: bigint | null = null;
+    const r = classicalOrderFind(a, N, 10000);
+    if (r === null) {
+      emit({ label: 'Order not found', description: `Could not find the order of ${a} mod ${N} within the iteration limit. Retrying with a different base.`, data: null, success: false, retryReason: 'order not found' });
+      continue;
+    }
 
-    if (toyMode) {
-      // Build period table: f(x) = a^x mod N for x = 0 .. 4r (capped at 200)
-      const rClassical = classicalOrderFind(a, N, 10000);
-      if (rClassical === null) {
-        emit({ label: 'Order not found', description: `Could not find order of ${a} mod ${N} within iteration limit. Retrying.`, data: null, success: false, retryReason: 'order not found' });
-        continue;
-      }
-      r = rClassical;
+    // Period table: f(x) = a^x mod N for x = 0 … 2r (capped at 200 columns).
+    const tableLen = Math.min(Number(r) * 2 + 1, 200);
+    const table: Array<{ x: number; fx: number }> = [];
+    for (let x = 0; x < tableLen; x++) {
+      table.push({ x, fx: Number(modPow(a, BigInt(x), N)) });
+    }
+    emit({
+      label: 'Period table',
+      description: `f(x) = ${a}^x mod ${N} is periodic with period r = ${r} — the value the quantum step finds. (Order computed by direct search; the quantum order-finding is simulated.)`,
+      data: { table, period: Number(r), a: Number(a), N: Number(N) },
+      success: true
+    });
 
-      const tableLen = Number(r) * 2 + 1;
-      const table: Array<{ x: number; fx: number }> = [];
-      for (let x = 0; x < Math.min(tableLen, 200); x++) {
-        table.push({ x, fx: Number(modPow(a, BigInt(x), N)) });
-      }
+    // QFT measurement: sample from the ideal distribution (peaks at k·Q/r),
+    // then recover the order from the sampled phase via continued fractions —
+    // re-sampling when a measurement lands on an unhelpful peak (k sharing a
+    // factor with r), exactly as a real run would.
+    const dist = computeQFTDistribution(Number(r), Q);
+    const peakList = Array.from({ length: Math.min(Number(r), 8) }, (_, k) => Math.round((k * Q) / Number(r)));
+    const peakStr = peakList.join(', ') + (Number(r) > 8 ? ', …' : '');
 
+    let measuredM = sampleQFTMeasurement(dist);
+    let convergents = continuedFractionConvergents(BigInt(measuredM), Qn, N);
+    let recovered = convergents.find(c => c.den >= 2n && modPow(a, c.den, N) === 1n)?.den ?? null;
+
+    for (let mTry = 1; recovered === null && mTry < 6; mTry++) {
       emit({
-        label: 'Period table',
-        description: `f(x) = ${a}^x mod ${N} — period r = ${r} (computed classically for toy-mode N ≤ 1000).`,
-        data: { table, period: Number(r), a: Number(a), N: Number(N) },
-        success: true
-      });
-
-      // Also show QFT distribution for educational purposes
-      const dist = computeQFTDistribution(Number(r), Q);
-      const measuredM = await sampleQFTMeasurement(dist);
-      emit({
-        label: 'QFT distribution',
-        description: `(Classically simulated) Q = ${Q}, expected peaks at m = ${Array.from({ length: Number(r) }, (_, k) => Math.round(k * Q / Number(r))).join(', ')}. Sampled m = ${measuredM}.`,
+        label: 'QFT measurement',
+        description: `Sampled m = ${measuredM} → phase ${measuredM}/${Q}. Continued fractions gave no denominator with ${a}^r ≡ 1 mod ${N} (peak shared a factor with r) — re-running the quantum measurement.`,
         data: { distribution: dist, measured: measuredM, Q, r: Number(r) },
-        success: true
+        success: false,
+        retryReason: 'measurement not useful'
       });
-    } else {
-      // Quantum simulation mode: use QFT distribution to find r
-      // We simulate: pick m, run continued fractions to find r
-      // We try multiple measurements if needed
-      let foundR = false;
-      for (let mAttempt = 0; mAttempt < 5 && !foundR; mAttempt++) {
-        // For large N we don't know r; simulate by trying candidate orders
-        // via a broad QFT distribution then continued fractions
-        const broadDist = computeQFTBroad(Q);
-        const m = await sampleQFTMeasurement(broadDist);
-        const convergents = continuedFractionConvergents(BigInt(m), Qn, N);
-
-        emit({
-          label: 'QFT measurement',
-          description: `(Classically simulated) Q = ${Q}, measured m = ${m}, phase ≈ ${m}/${Q}.`,
-          data: { distribution: broadDist.slice(0, 100), measured: m, Q },
-          success: true
-        });
-
-        for (const conv of convergents) {
-          if (conv.den >= 2n && modPow(a, conv.den, N) === 1n) {
-            r = conv.den;
-            emit({
-              label: 'Continued fractions',
-              description: `Phase ${m}/${Q} → convergents → r = ${r} (${a}^${r} ≡ 1 mod ${N} ✓).`,
-              data: { convergents, chosenR: r, m, Q: Qn },
-              success: true
-            });
-            foundR = true;
-            break;
-          }
-        }
-
-        if (!foundR) {
-          emit({
-            label: 'Continued fractions',
-            description: `Phase ${m}/${Q}: no convergent denominator satisfies a^r ≡ 1 mod ${N}. Re-sampling QFT.`,
-            data: { convergents, m, Q: Qn },
-            success: false
-          });
-        }
-      }
-
-      if (r === null) {
-        emit({ label: 'Order not found', description: `Could not determine order for a = ${a} mod ${N} via QFT simulation. Retrying.`, data: null, success: false, retryReason: 'QFT order not found' });
-        continue;
-      }
+      measuredM = sampleQFTMeasurement(dist);
+      convergents = continuedFractionConvergents(BigInt(measuredM), Qn, N);
+      recovered = convergents.find(c => c.den >= 2n && modPow(a, c.den, N) === 1n)?.den ?? null;
     }
 
-    // For toy mode, also run continued fractions on the QFT sample
-    if (toyMode && r !== null) {
-      // Continued fractions step: use QFT measurement
-      // We already have r from classical search; show the CF step on the QFT measurement
-      const lastQFTStep = steps.findLast(s => s.label === 'QFT distribution');
-      if (lastQFTStep) {
-        const stepData = lastQFTStep.data as { measured: number; Q: number };
-        const m = stepData.measured;
-        const convergents = continuedFractionConvergents(BigInt(m), Qn, N);
-        // Check if continued fractions would recover r
-        const cfR = convergents.find(c => c.den >= 2n && modPow(a, c.den, N) === 1n);
-        emit({
-          label: 'Continued fractions',
-          description: cfR
-            ? `Phase ${m}/${Q} → convergents → r = ${cfR.den} ✓ (confirms classical result r = ${r}).`
-            : `Phase ${m}/${Q} → convergents tried (sampled m may not yield exact period; classical r = ${r} confirmed).`,
-          data: { convergents, chosenR: cfR?.den ?? r, m, Q: Qn },
-          success: true
-        });
-      }
-    }
+    emit({
+      label: 'QFT distribution',
+      description: `(Simulated) Register Q = ${Q}; the distribution peaks at m = ${peakStr}. Sampled measurement m = ${measuredM}, phase ${measuredM}/${Q}.`,
+      data: { distribution: dist, measured: measuredM, Q, r: Number(r) },
+      success: true
+    });
 
-    if (r === null) continue;
+    emit({
+      label: 'Continued fractions',
+      description: recovered !== null
+        ? `Phase ${measuredM}/${Q} → convergents → r = ${recovered} (verified ${a}^${recovered} ≡ 1 mod ${N} ✓).`
+        : `Phase ${measuredM}/${Q}: convergents inconclusive after several measurements; proceeding with the simulated order r = ${r}.`,
+      data: { convergents, chosenR: recovered ?? r, m: measuredM, Q: Qn },
+      success: true
+    });
 
     // ── Factor extraction ─────────────────────────────────────────────────
 
@@ -311,19 +283,4 @@ export async function runShor(
     attempts,
     totalTime: performance.now() - startTime
   };
-}
-
-/**
- * Broad QFT distribution for quantum simulation mode (unknown r).
- * Samples uniformly across Q to let continued fractions find the period.
- */
-function computeQFTBroad(Q: number): Array<{ m: number; probability: number }> {
-  // Sample 200 evenly-spaced points — continued fractions will find r
-  const count = Math.min(200, Q);
-  const step = Math.floor(Q / count);
-  const dist: Array<{ m: number; probability: number }> = [];
-  for (let i = 1; i < count; i++) {
-    dist.push({ m: i * step, probability: 1 / count });
-  }
-  return dist;
 }

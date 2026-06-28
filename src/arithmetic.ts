@@ -80,6 +80,20 @@ export function checkPerfectPower(n: bigint): { isPerfectPower: boolean; base?: 
 }
 
 /**
+ * Primality test by trial division. Exact and fast for the demo's range
+ * (N < 10,000 → trial divisors only up to √N < 100).
+ */
+export function isPrime(n: bigint): boolean {
+  if (n < 2n) return false;
+  if (n < 4n) return true; // 2 and 3
+  if (n % 2n === 0n) return false;
+  for (let i = 3n; i * i <= n; i += 2n) {
+    if (n % i === 0n) return false;
+  }
+  return true;
+}
+
+/**
  * Classical order finding: finds smallest r such that a^r ≡ 1 (mod n).
  * Only for toy numbers (n < 1000). Returns r or null if not found within maxIter.
  */

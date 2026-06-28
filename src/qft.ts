@@ -16,17 +16,22 @@
  * Peaks sharply at m = k·Q/r for k = 0,1,...,r-1.
  *
  * For large Q, we only compute near expected peaks (within ±4 of k·Q/r)
- * to keep computation tractable. Returns at most 500 data points.
+ * to keep computation tractable. When the order r is large we render only the
+ * first `maxPeaks` peaks so the chart stays legible and every sampled point
+ * remains visible; the full distribution has r equiprobable peaks.
+ * Returns at most 500 data points.
  *
  * (Classically simulated — not a real quantum measurement.)
  */
 export function computeQFTDistribution(
   r: number,
-  Q: number
+  Q: number,
+  maxPeaks = 48
 ): Array<{ m: number; probability: number; peak: boolean }> {
   const results: Array<{ m: number; probability: number; peak: boolean }> = [];
   const visited = new Set<number>();
   const WIN = 4;
+  const peaksShown = Math.min(r, maxPeaks);
   // M = number of terms summed in the QFT (floor(Q/r))
   const M = Math.floor(Q / r);
 
@@ -52,7 +57,7 @@ export function computeQFTDistribution(
   }
 
   // Sample near each expected peak k·Q/r
-  for (let k = 0; k < r; k++) {
+  for (let k = 0; k < peaksShown; k++) {
     const center = Math.round((k * Q) / r);
     for (let dm = -WIN; dm <= WIN; dm++) {
       const m = ((center + dm) % Q + Q) % Q;
