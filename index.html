@@ -130,20 +130,26 @@
   })();
 </script>
 <!-- END crypto-lab shared header -->
-    <header class="site-header">
-      <div class="site-header__title">
-        <span class="site-header__logo">⟨ψ|</span>
-        <span class="site-header__name">crypto-lab-shor</span>
-        <span class="site-header__subtitle">Shor's Algorithm — The Reason Everything Changed</span>
-      </div>
-      <button id="theme-toggle" class="theme-toggle" style="position: absolute; top: 0; right: 0" aria-label="Switch to light mode">🌙</button>
-    </header>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Switch to light mode">🌙</button>
 
     <main class="app-layout">
 
+      <!-- ── Hero — fleet-standard header ──────────────────────────── -->
+      <header class="cl-hero">
+        <div class="cl-hero-main">
+          <h1 class="cl-hero-title">Shor's Algorithm</h1>
+          <p class="cl-hero-sub">Quantum period-finding · QFT · continued fractions</p>
+          <p class="cl-hero-desc">Factor an integer N by turning it into quantum order-finding: extract the period of a mod N via the QFT and continued fractions, then recover the factors with gcd(a^(r/2)±1, N).</p>
+        </div>
+        <aside class="cl-hero-why" aria-label="Why it matters">
+          <span class="cl-hero-why-label">WHY IT MATTERS</span>
+          <p class="cl-hero-why-text">RSA, ECC, and Diffie-Hellman all rest on factoring and discrete logs being hard — the same problems Shor solves in polynomial time. A large enough quantum computer would break the encryption guarding nearly every website, bank, and message.</p>
+        </aside>
+      </header>
+
       <!-- ── Intro — what & why ────────────────────────────────────── -->
       <section class="intro" aria-label="About Shor's algorithm">
-        <h1 class="intro__title">What is Shor's Algorithm?</h1>
+        <h2 class="intro__title">What is Shor's Algorithm?</h2>
         <p class="intro__lede">
           Back in 1994, mathematician <strong>Peter Shor</strong> had a
           brilliant insight: a quantum computer could factor large numbers
