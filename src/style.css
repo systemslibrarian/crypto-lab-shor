@@ -337,6 +337,219 @@ a:focus-visible {
    so keyboard users can pan them; this gives the focus ring something to hug. */
 .table-scroll { overflow-x: auto; }
 
+/* ── 'Try to break it' hint under the controls ─────────────────────────── */
+.controls-hint {
+  flex-basis: 100%;
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+.controls-hint strong { color: var(--text-bright); }
+.controls-hint em { color: var(--quantum); font-style: normal; font-weight: bold; }
+
+/* ── The two 'aha' explainers ──────────────────────────────────────────── */
+.aha-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 900px) {
+  .aha-grid { grid-template-columns: 1fr 1fr; }
+}
+.aha {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--quantum);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.aha__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  color: var(--text-bright);
+  font-weight: bold;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  user-select: none;
+}
+.aha__summary em { color: var(--quantum); font-style: normal; }
+.aha__summary:hover { background: var(--bg-panel-2); }
+.aha__summary:focus-visible { outline: 2px solid var(--quantum); outline-offset: -2px; }
+.aha__num {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 1.5rem; height: 1.5rem;
+  border: 1px solid var(--quantum);
+  border-radius: 50%;
+  color: var(--quantum);
+  font-size: 0.8rem;
+}
+.aha__body {
+  padding: 0 1rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+.aha__body p { margin-bottom: 0.6rem; }
+.aha__body em { color: var(--quantum); font-style: normal; font-weight: bold; }
+.aha__body strong { color: var(--text-bright); }
+.aha__eq {
+  font-family: var(--font);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 0.3rem;
+  color: var(--classical);
+  white-space: nowrap;
+}
+.aha__chain {
+  margin: 0 0 0.6rem 1.1rem;
+  padding: 0;
+}
+.aha__chain li { margin-bottom: 0.45rem; }
+.aha__foot {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+  margin-top: 0.2rem;
+}
+.aha__foot em { color: var(--text-bright); }
+.aha__sim { color: var(--text-dim); font-style: italic; }
+.aha__phase--add { color: var(--success); font-weight: bold; }
+.aha__phase--cancel { color: var(--failure); font-weight: bold; }
+
+/* Live-numbers strip inside aha 1 — populated after a successful run. */
+.aha__live {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.7rem;
+  margin-bottom: 0.7rem;
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+.aha__live[data-empty="true"] { color: var(--text-dim); font-style: italic; }
+.aha__live-label {
+  display: inline-block;
+  font-weight: bold;
+  color: var(--text-bright);
+  letter-spacing: 0.04em;
+  margin-right: 0.35rem;
+}
+.aha__live-text { color: var(--text-dim); }
+.aha__live code {
+  font-family: var(--font);
+  color: var(--classical);
+  background: var(--bg);
+  border-radius: 3px;
+  padding: 0 0.25rem;
+}
+.aha__live .aha__live-hit { color: var(--success); font-weight: bold; }
+
+/* ── Stage banner (progressive pacing between run stages) ──────────────── */
+.stage-banner {
+  margin: 0.6rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--quantum);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--quantum) 8%, transparent);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+.stage-banner strong { color: var(--text-bright); }
+.stage-banner .stage-banner__now { color: var(--success); font-weight: bold; }
+.stage-banner .stage-banner__next { color: var(--quantum); font-weight: bold; }
+
+/* Highlight the gcd 'Factors found' step when it fires — the conceptual payoff. */
+.step-entry--highlight {
+  background: color-mix(in oklab, var(--success) 10%, transparent);
+  border-color: var(--success);
+  box-shadow: var(--glow-s);
+}
+
+/* ── Phasor wheels — the visible QFT interference mechanism ─────────────── */
+.phasor-block { margin-bottom: 0.5rem; }
+.phasor-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.phasor-freq-label { color: var(--text-dim); font-size: 0.8rem; }
+.phasor-freq-btn {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.phasor-freq-btn:hover { border-color: var(--quantum); }
+.phasor-freq-btn.active { background: var(--quantum); color: #000; border-color: var(--quantum); }
+.phasor-freq-btn--peak { border-color: var(--peak); }
+/* Dark-theme --peak (#ff00ff) is bright → black text (6.7:1). Light-theme --peak
+   (#8250df) is dark → white text (5.05:1). Both clear WCAG AA. */
+.phasor-freq-btn--peak.active { background: var(--peak); color: #000; border-color: var(--peak); }
+[data-theme="light"] .phasor-freq-btn--peak.active { color: #fff; }
+[data-theme="light"] .phasor-freq-btn.active { color: #fff; }
+.phasor-freq-btn:focus-visible { outline: 2px solid var(--quantum); outline-offset: 2px; }
+
+.phasor-wheels {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.phasor-wheel { text-align: center; }
+.phasor-wheel svg { display: block; }
+.phasor-wheel__cap { font-size: 0.72rem; color: var(--text-dim); margin-top: 0.15rem; }
+.phasor-hand { stroke: var(--quantum); stroke-width: 2; stroke-linecap: round; }
+.phasor-circle { fill: none; stroke: var(--border); stroke-width: 1; }
+.phasor-sum { text-align: center; padding-left: 0.5rem; border-left: 1px dashed var(--border); }
+.phasor-sum svg { display: block; margin: 0 auto; }
+.phasor-sum__vec { stroke-width: 2.5; stroke-linecap: round; }
+.phasor-sum__vec--add { stroke: var(--success); }
+.phasor-sum__vec--cancel { stroke: var(--failure); }
+.phasor-sum__label { font-size: 0.72rem; margin-top: 0.15rem; }
+.phasor-sum__label--add { color: var(--success); font-weight: bold; }
+.phasor-sum__label--cancel { color: var(--failure); font-weight: bold; }
+.phasor-explain { font-size: 0.78rem; color: var(--text-dim); line-height: 1.55; margin-top: 0.5rem; }
+
+/* CF winning-convergent link to the sampled QFT point (shared color = success) */
+.qft-bar--sampled { /* already styled below; row link uses same success token */ }
+.convergents tr.conv-winner td { background: color-mix(in oklab, var(--success) 12%, transparent); }
+.convergents tr.conv-winner td:first-child { border-left: 3px solid var(--success); }
+.cf-caption {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin-bottom: 0.5rem;
+}
+.cf-caption strong { color: var(--text-bright); }
+.cf-caption .cf-caption__sampled { color: var(--success); font-weight: bold; }
+
+/* Light theme: --success (#1a7f37) dips below 4.5:1 once these small texts sit
+   on a green/quantum-tinted background. Use a darker green there (≥6.3:1 on all
+   the tints in play). Dark theme keeps the bright --success (high contrast). */
+[data-theme="light"] .stage-banner__now,
+[data-theme="light"] .cf-caption__sampled,
+[data-theme="light"] .convergents .conv-ok,
+[data-theme="light"] .aha__live .aha__live-hit,
+[data-theme="light"] .phasor-sum__label--add,
+[data-theme="light"] .aha__phase--add { color: #116329; }
+
 /* ── Panel shell ───────────────────────────────────────────────────────── */
 .panel {
   background: var(--bg-panel);
@@ -484,11 +697,38 @@ a:focus-visible {
 .rsa-impact__section-title:first-child { margin-top: 0; }
 
 .complexity-chart { margin-bottom: 0.5rem; }
-.complexity-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
-.complexity-label { width: 130px; flex-shrink: 0; color: var(--text-dim); }
-.complexity-bar { height: 12px; border-radius: 2px; }
-.complexity-bar--classical { background: var(--failure); max-width: 180px; }
-.complexity-bar--quantum { background: var(--quantum); max-width: 180px; }
+.complexity-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: center;
+  column-gap: 0.5rem;
+  row-gap: 0.15rem;
+  margin-bottom: 0.5rem;
+}
+.complexity-label { color: var(--text-dim); }
+/* Bars share the same 1fr track, so their inline widths (100% vs 39.1%) are
+   to scale against one another — a true log-axis comparison. */
+.complexity-bar {
+  height: 16px;
+  border-radius: 2px;
+  min-width: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: bold;
+  color: #000;
+  white-space: nowrap;
+}
+.complexity-bar sup { font-size: 0.85em; }
+.complexity-bar--classical { background: var(--failure); }
+.complexity-bar--quantum { background: var(--quantum); }
+/* Both accents are dark in light theme — their in-bar labels need light text. */
+[data-theme="light"] .complexity-bar--classical,
+[data-theme="light"] .complexity-bar--quantum { color: #fff; }
+/* Formula sits on its own line under the bar, spanning the track. */
+.complexity-formula { grid-column: 2; font-size: 0.75rem; color: var(--text-dim); }
 .complexity-formula { font-size: 0.75rem; color: var(--text-dim); }
 .complexity-note { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.4rem; line-height: 1.5; }
 

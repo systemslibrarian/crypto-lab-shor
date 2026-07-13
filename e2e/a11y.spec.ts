@@ -33,17 +33,27 @@ async function expandAll(page: Page): Promise<void> {
   });
 }
 
-// Run the algorithm on N=15 (needs real order-finding → produces the period
-// table, QFT distribution, and continued-fraction table). Wait for the async
-// step replay + result banner to finish so every injected region is in the DOM.
+// Run the algorithm on a semiprime that needs real order-finding → produces the
+// period table, QFT distribution + phasor wheels, and continued-fraction table.
+// Shor is randomized: a run can short-circuit via a "Lucky GCD" (the base shares
+// a factor with N) and emit no quantum visualization. That is correct behavior,
+// not a bug — so we re-run until a run actually exercises the quantum path and
+// injects the viz sections, then scan that fully-populated DOM.
 async function driveDemo(page: Page): Promise<void> {
-  await page.locator('#n-input').fill('15');
-  await page.locator('#run-btn').click();
-  // Result banner appears once the run completes.
-  await expect(page.locator('.result-banner')).toBeVisible({ timeout: 30_000 });
-  // Order-finding visualizations should have rendered.
+  await page.locator('#n-input').fill('143'); // 11 × 13 — lower Lucky-GCD odds than 15
+  for (let attempt = 0; attempt < 12; attempt++) {
+    await expect(page.locator('#run-btn')).toBeEnabled({ timeout: 30_000 });
+    await page.locator('#run-btn').click();
+    // Result banner appears once the run completes.
+    await expect(page.locator('.result-banner')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('#run-btn')).toBeEnabled({ timeout: 30_000 });
+    // Did this run take the quantum path (period/QFT/CF viz rendered)?
+    if (await page.locator('#viz-panel .viz-section').first().isVisible()) return;
+    // Lucky-GCD short-circuit — reset and try a fresh base.
+    await page.locator('#reset-btn').click();
+  }
+  // Guarantee the assertion (and a clear failure) if we never hit the quantum path.
   await expect(page.locator('#viz-panel .viz-section').first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('#run-btn')).toBeEnabled({ timeout: 30_000 });
 }
 
 async function scan(page: Page): Promise<void> {

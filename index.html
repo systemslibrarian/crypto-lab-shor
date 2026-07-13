@@ -217,6 +217,78 @@
         <button id="run-btn" class="run-btn" aria-label="Run Shor's Algorithm">▶ Run Shor's Algorithm</button>
         <button id="reset-btn" class="reset-btn" aria-label="Reset">Reset</button>
         <p id="n-error" class="input-error" role="alert" hidden></p>
+        <p class="controls-hint">
+          <span aria-hidden="true">🔬</span> Shor is <strong>randomized</strong>: each run picks a fresh
+          base <em>a</em> and can fail and retry. Try <strong>N = 21</strong> or <strong>91</strong>
+          and run it <em>several times</em> — watch the base, the period, and the retry path change every time.
+        </p>
+      </section>
+
+      <!-- ── The two 'aha' explainers — always visible ─────────────── -->
+      <section class="aha-grid" aria-label="Why the algorithm works">
+
+        <!-- Aha 1: why period-finding factors N -->
+        <details class="aha" id="aha-period" open>
+          <summary class="aha__summary">
+            <span class="aha__num" aria-hidden="true">1</span>
+            Why does the period <em>r</em> let you factor <em>N</em>?
+          </summary>
+          <div class="aha__body">
+            <p>
+              Pick a base <em>a</em> and look at its <strong>order</strong> <em>r</em> — the
+              smallest power with <span class="aha__eq">a<sup>r</sup> ≡ 1 (mod N)</span>. That one
+              fact is a factoring machine:
+            </p>
+            <ol class="aha__chain">
+              <li><span class="aha__eq">a<sup>r</sup> ≡ 1</span> means <span class="aha__eq">a<sup>r</sup> − 1 ≡ 0 (mod N)</span>.</li>
+              <li>If <em>r</em> is <strong>even</strong>, factor the left side as a difference of squares:
+                  <span class="aha__eq">(a<sup>r/2</sup> − 1)(a<sup>r/2</sup> + 1) ≡ 0 (mod N)</span>.</li>
+              <li>So <em>N</em> divides that product. Unless <span class="aha__eq">a<sup>r/2</sup> ≡ ±1</span>
+                  (the two dead-ends the demo retries past), <em>N</em>'s prime factors must split between the
+                  two factors — so each shares a <strong>real</strong> factor with <em>N</em>.</li>
+              <li>Peel them off with the fast, classical
+                  <span class="aha__eq">gcd(a<sup>r/2</sup> ± 1, N)</span>.</li>
+            </ol>
+            <div class="aha__live" id="aha-period-live" data-empty="true" aria-live="polite">
+              <span class="aha__live-label">This run:</span>
+              <span class="aha__live-text">run the algorithm and the exact numbers from your factorisation appear here.</span>
+            </div>
+            <p class="aha__foot">
+              The quantum computer's <em>only</em> job is finding <em>r</em>. Everything above is ordinary
+              arithmetic — which is why the whole attack collapses to "find the period fast."
+            </p>
+          </div>
+        </details>
+
+        <!-- Aha 2: why the QFT peaks at k·Q/r -->
+        <details class="aha" id="aha-qft" open>
+          <summary class="aha__summary">
+            <span class="aha__num" aria-hidden="true">2</span>
+            Why does the QFT concentrate at multiples of <em>Q/r</em>?
+          </summary>
+          <div class="aha__body">
+            <p>
+              After order-finding, the register holds every input <em>x</em> that shares one
+              <em>f(x) = a<sup>x</sup> mod N</em> value — an evenly spaced comb <em>x₀, x₀+r, x₀+2r, …</em>
+              The QFT gives each state a phase that <strong>spins as a clock hand</strong>, at a rate set by
+              the frequency <em>m</em> you might measure.
+            </p>
+            <ul class="aha__chain">
+              <li>At a frequency <em>m</em> where <span class="aha__eq">m·r/Q</span> is a whole number, every
+                  hand in the comb points the <strong>same way</strong> — they add up
+                  (<span class="aha__phase aha__phase--add">constructive interference</span>). That happens
+                  exactly at <span class="aha__eq">m = k·Q/r</span>.</li>
+              <li>At any other <em>m</em> the hands fan out around the circle and
+                  <strong>cancel</strong> (<span class="aha__phase aha__phase--cancel">destructive interference</span>) — near-zero probability.</li>
+            </ul>
+            <p class="aha__foot">
+              So a single measurement almost always lands on a spike at <em>k·Q/r</em>. The
+              <strong>phasor wheels</strong> below animate exactly this — watch the hands align at the period
+              and scatter off it. <span class="aha__sim">(classically simulated)</span>
+            </p>
+          </div>
+        </details>
+
       </section>
 
       <!-- ── Panel A — Algorithm Steps ─────────────────────────────── -->
@@ -249,20 +321,23 @@
           <div class="panel__header">RSA IMPACT</div>
           <div class="rsa-impact">
 
-            <h3 class="rsa-impact__section-title">FACTORING COMPLEXITY (log scale)</h3>
-            <div class="complexity-chart" role="img" aria-label="Comparison of classical GNFS and quantum Shor algorithm complexity on a logarithmic scale">
+            <h3 class="rsa-impact__section-title">FACTORING COMPLEXITY AT RSA-2048</h3>
+            <div class="complexity-chart" role="img" aria-label="Operations to factor RSA-2048 on a logarithmic axis: classical GNFS about 10^23 operations, quantum Shor about 10^9 operations. Each bar's length is proportional to the exponent, so the classical bar is roughly 23 units and the quantum bar roughly 9 units.">
               <div class="complexity-row">
                 <span class="complexity-label">Classical (GNFS)</span>
-                <div class="complexity-bar complexity-bar--classical" style="width:100%"></div>
+                <!-- Bar length ∝ log10(ops). Classical ≈ 10^23 → 23/23 of the axis. -->
+                <div class="complexity-bar complexity-bar--classical" style="width:100%">10<sup>23</sup> ops</div>
                 <span class="complexity-formula">exp(O((log N)<sup>1/3</sup>))</span>
               </div>
               <div class="complexity-row">
                 <span class="complexity-label">Quantum (Shor)</span>
-                <div class="complexity-bar complexity-bar--quantum" style="width:25%"></div>
+                <!-- Bar length ∝ log10(ops). Quantum ≈ 10^9 → 9/23 ≈ 39% of the axis. -->
+                <div class="complexity-bar complexity-bar--quantum" style="width:39.1%">10<sup>9</sup> ops</div>
                 <span class="complexity-formula">O((log N)<sup>3</sup>)</span>
               </div>
-              <p class="complexity-note">At RSA-2048: Classical ≈ 10<sup>23</sup> ops | Quantum ≈ 10<sup>9</sup> ops<br>
-              Speedup: ~10<sup>14</sup>× — fourteen orders of magnitude</p>
+              <p class="complexity-note">Bars are on a <strong>log₁₀ axis</strong> (length ∝ number of digits in the op count).
+              The 14-unit gap between them is a factor of <strong>~10<sup>14</sup>×</strong> — fourteen orders of
+              magnitude, not the 2–3× a linear bar would suggest.</p>
             </div>
 
             <h3 class="rsa-impact__section-title">RESOURCE REQUIREMENTS</h3>

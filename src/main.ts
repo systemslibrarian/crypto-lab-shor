@@ -27,6 +27,7 @@ const stepLog  = document.getElementById('step-log')  as HTMLDivElement;
 const vizPanel = document.getElementById('viz-panel') as HTMLDivElement;
 const nError   = document.getElementById('n-error')   as HTMLParagraphElement;
 const liveCallout = document.getElementById('live-callout') as HTMLDivElement;
+const ahaPeriodLive = document.getElementById('aha-period-live') as HTMLDivElement;
 
 // ── Run state ────────────────────────────────────────────────────────────
 // `isRunning` blocks re-entry from every trigger (Run button, Enter, presets),
@@ -61,6 +62,12 @@ function renderStep(step: ShorStep, N: bigint): void {
   const { tag, cssClass } = classifyStep(step.label);
   const entry = document.createElement('div');
   entry.className = `step-entry ${cssClass}`;
+  // The gcd payoff — Shor's conceptual heart. Highlight it and mirror the exact
+  // numbers into the always-visible "Why period-finding factors N" explainer.
+  if (step.label === 'Factors found' && step.success) {
+    entry.classList.add('step-entry--highlight');
+    populateAhaPeriod(step, N);
+  }
 
   const tagSpan = document.createElement('span');
   tagSpan.className = cssClass.includes('quantum')
@@ -179,12 +186,26 @@ function renderViz(step: ShorStep, N: bigint): void {
     note.style.cssText = 'font-size:0.75rem;color:var(--text-dim);margin-top:0.4rem';
     note.textContent = `Sampled measurement: m = ${data.measured}  (magenta = peaks at k·Q/r,  green = sampled point)`;
     sec.appendChild(note);
+
+    // Phasor wheels: make the interference that CREATES those peaks visible.
+    renderPhasors(sec, data.r, data.Q, data.measured);
   }
 
   if (step.label === 'Continued fractions') {
     const data = step.data as { convergents: Array<{num:bigint; den:bigint}>; chosenR: bigint; m: number|bigint; Q: bigint };
     const a = extractA();
     const sec = getVizSection('cf', `Continued Fraction Extraction  —  phase ${data.m} / ${data.Q}`);
+
+    // Plain-language purpose + the visual bridge from the sampled QFT point.
+    const caption = document.createElement('p');
+    caption.className = 'cf-caption';
+    caption.innerHTML =
+      `The measurement gave a noisy fraction <span class="cf-caption__sampled">m/Q = ${data.m}/${data.Q}</span> ` +
+      `(the <strong>green sampled bar</strong> above). It is close to some clean <em>k/r</em>, but we don't yet know <em>r</em>. ` +
+      `<strong>Continued fractions</strong> expand that decimal into its best simple-fraction approximations (convergents); ` +
+      `the first denominator that passes <span class="cf-caption__sampled">a<sup>r</sup> ≡ 1 (mod N)</span> is the period <em>r</em> — highlighted below.`;
+    sec.appendChild(caption);
+
     const tableWrap = document.createElement('div');
     tableWrap.className = 'table-scroll';
     tableWrap.setAttribute('tabindex', '0');
@@ -194,24 +215,202 @@ function renderViz(step: ShorStep, N: bigint): void {
     table.className = 'convergents';
     table.innerHTML = '<caption class="sr-only">Continued fraction convergents and whether each denominator is the period</caption><thead><tr><th scope="col">Convergent</th><th scope="col">Fraction</th><th scope="col">Test: a^r ≡ 1 mod N?</th></tr></thead>';
     const tbody = document.createElement('tbody');
+    let winnerFound = false;
     data.convergents.forEach((conv, i) => {
       const tr = document.createElement('tr');
       let testText = '—';
       let testClass = 'conv-fail';
+      let isWinner = false;
       if (a !== null && conv.den >= 2n) {
         try {
           const check = modPow(a, conv.den, N);
-          if (check === 1n) { testText = `✓  r = ${conv.den}`; testClass = 'conv-ok'; }
-          else { testText = `${a}^${conv.den} ≡ ${check} mod ${N}`; }
+          if (check === 1n) {
+            testText = `✓  r = ${conv.den}`;
+            testClass = 'conv-ok';
+            if (!winnerFound) { isWinner = true; winnerFound = true; }
+          } else { testText = `${a}^${conv.den} ≡ ${check} mod ${N}`; }
         } catch { testText = '—'; }
       }
-      tr.innerHTML = `<td>${i + 1}</td><td>${conv.num}/${conv.den}</td><td class="${testClass}">${testText}</td>`;
+      if (isWinner) tr.className = 'conv-winner';
+      const flag = isWinner ? ' ← the period r' : '';
+      tr.innerHTML = `<td>${i + 1}</td><td>${conv.num}/${conv.den}</td><td class="${testClass}">${testText}${flag}</td>`;
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
     tableWrap.appendChild(table);
     sec.appendChild(tableWrap);
   }
+}
+
+// ── Phasor wheels — the visible QFT interference mechanism ───────────────
+// For the comb of inputs x = 0, r, 2r, 3r, … (all sharing one f(x) value),
+// the QFT assigns each state a phase φ = 2π·m·x/Q — a rotating "clock hand".
+// The measured probability at frequency m is |Σ e^{iφ}|². This panel draws
+// those hands for the first few comb entries at a chosen m, then their vector
+// sum, so the learner SEES them align at m = k·Q/r and cancel elsewhere.
+// (Classically simulated — same |Σ e^{iφ}|² the qft.ts distribution plots.)
+const SVGNS = 'http://www.w3.org/2000/svg';
+function svgEl(name: string, attrs: Record<string, string>): SVGElement {
+  const el = document.createElementNS(SVGNS, name);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+function renderPhasors(sec: HTMLElement, r: number, Q: number, measured: number): void {
+  if (r < 2 || Q < 2) return;
+  const NHANDS = Math.min(6, r); // comb entries shown: x = 0, r, 2r, … up to 6
+  const kNear = Math.round((measured * r) / Q); // nearest peak index k to the sample
+  const peakM = Math.round((kNear * Q) / r);    // an exact on-peak frequency k·Q/r
+  const offM = Math.max(1, peakM - Math.max(1, Math.round(Q / (r * 4)))); // an off-peak frequency
+
+  const block = document.createElement('div');
+  block.className = 'phasor-block';
+
+  const title = document.createElement('div');
+  title.className = 'viz-section__title';
+  title.textContent = 'Phasor wheels — why the peaks form (classically simulated)';
+  block.appendChild(title);
+
+  // Frequency selector: the sampled m, an exact on-peak m, and an off-peak m.
+  const controls = document.createElement('div');
+  controls.className = 'phasor-controls';
+  const lbl = document.createElement('span');
+  lbl.className = 'phasor-freq-label';
+  lbl.textContent = 'Set frequency m:';
+  controls.appendChild(lbl);
+
+  const wheelsHost = document.createElement('div');
+  wheelsHost.className = 'phasor-wheels';
+
+  const explain = document.createElement('p');
+  explain.className = 'phasor-explain';
+
+  type Choice = { m: number; label: string; peak: boolean };
+  const choices: Choice[] = [];
+  const seen = new Set<number>();
+  const push = (c: Choice) => { if (!seen.has(c.m)) { seen.add(c.m); choices.push(c); } };
+  push({ m: peakM, label: `on-peak  m = ${peakM} = ${kNear}·Q/r`, peak: true });
+  push({ m: measured, label: `sampled  m = ${measured}`, peak: (measured * r) % Q === 0 });
+  push({ m: offM, label: `off-peak  m = ${offM}`, peak: false });
+
+  function draw(m: number): void {
+    wheelsHost.innerHTML = '';
+    // Resultant accumulation
+    let sx = 0, sy = 0;
+    const R = 22, cx = 26, cy = 26;
+    for (let j = 0; j < NHANDS; j++) {
+      const x = j * r;                       // comb entry
+      const phi = 2 * Math.PI * ((m * x) % Q) / Q;
+      const hx = cx + R * Math.cos(phi);
+      const hy = cy - R * Math.sin(phi);
+      sx += Math.cos(phi);
+      sy += Math.sin(phi);
+
+      const wheel = document.createElement('div');
+      wheel.className = 'phasor-wheel';
+      const svg = svgEl('svg', { width: '52', height: '52', viewBox: '0 0 52 52',
+        role: 'img', 'aria-label': `Phasor for input x = ${x}: clock hand at ${Math.round((phi * 180) / Math.PI)} degrees.` });
+      svg.appendChild(svgEl('circle', { class: 'phasor-circle', cx: `${cx}`, cy: `${cy}`, r: `${R}` }));
+      svg.appendChild(svgEl('line', { class: 'phasor-hand', x1: `${cx}`, y1: `${cy}`, x2: `${hx.toFixed(1)}`, y2: `${hy.toFixed(1)}` }));
+      wheel.appendChild(svg);
+      const cap = document.createElement('div');
+      cap.className = 'phasor-wheel__cap';
+      cap.textContent = `x=${x}`;
+      wheel.appendChild(cap);
+      wheelsHost.appendChild(wheel);
+    }
+
+    // Resultant sum vector
+    const mag = Math.sqrt(sx * sx + sy * sy);
+    const aligned = mag > NHANDS * 0.8; // hands roughly all pointing the same way
+    const sumBox = document.createElement('div');
+    sumBox.className = 'phasor-sum';
+    const R2 = 22, cx2 = 26, cy2 = 26;
+    const scale = R2 / NHANDS;
+    const ex = cx2 + sx * scale;
+    const ey = cy2 - sy * scale;
+    const svg2 = svgEl('svg', { width: '52', height: '52', viewBox: '0 0 52 52',
+      role: 'img', 'aria-label': `Vector sum of the ${NHANDS} hands: magnitude ${mag.toFixed(1)} of a possible ${NHANDS}. ${aligned ? 'They add up.' : 'They mostly cancel.'}` });
+    svg2.appendChild(svgEl('circle', { class: 'phasor-circle', cx: `${cx2}`, cy: `${cy2}`, r: `${R2}` }));
+    svg2.appendChild(svgEl('line', {
+      class: `phasor-sum__vec ${aligned ? 'phasor-sum__vec--add' : 'phasor-sum__vec--cancel'}`,
+      x1: `${cx2}`, y1: `${cy2}`, x2: `${ex.toFixed(1)}`, y2: `${ey.toFixed(1)}` }));
+    sumBox.appendChild(svg2);
+    const sumLabel = document.createElement('div');
+    sumLabel.className = `phasor-sum__label ${aligned ? 'phasor-sum__label--add' : 'phasor-sum__label--cancel'}`;
+    sumLabel.textContent = aligned ? `Σ = ${mag.toFixed(1)} ✓ add` : `Σ = ${mag.toFixed(1)} ✗ cancel`;
+    sumBox.appendChild(sumLabel);
+    wheelsHost.appendChild(sumBox);
+
+    explain.innerHTML = aligned
+      ? `At <strong>m = ${m}</strong>, every hand points nearly the same way — they <span class="aha__phase--add">add</span> to a long resultant (Σ ≈ ${mag.toFixed(1)} of ${NHANDS}). This is a <strong>peak</strong>: a likely measurement.`
+      : `At <strong>m = ${m}</strong>, the hands fan around the circle and <span class="aha__phase--cancel">cancel</span> (Σ ≈ ${mag.toFixed(1)} of ${NHANDS}). Near-zero probability — an unlikely measurement.`;
+  }
+
+  choices.forEach((c, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'phasor-freq-btn' + (c.peak ? ' phasor-freq-btn--peak' : '');
+    btn.textContent = c.label;
+    btn.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+    if (i === 0) btn.classList.add('active');
+    btn.addEventListener('click', () => {
+      controls.querySelectorAll('.phasor-freq-btn').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
+      btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
+      draw(c.m);
+    });
+    controls.appendChild(btn);
+  });
+
+  block.appendChild(controls);
+  block.appendChild(wheelsHost);
+  block.appendChild(explain);
+  sec.appendChild(block);
+  draw(choices[0]!.m); // start on the on-peak frequency
+}
+
+// ── 'Why period-finding factors N' — live numbers from this run ──────────
+// Substitutes the actual a, r, a^(r/2), and both gcds into explainer #1 so the
+// learner sees the abstract chain instantiated by their own factorisation.
+function populateAhaPeriod(step: ShorStep, N: bigint): void {
+  const d = step.data as { a: bigint; r: bigint; half: bigint; p: bigint; q: bigint };
+  const halfExp = d.r / 2n;
+  const minus = d.half - 1n;
+  const plus = d.half + 1n;
+  ahaPeriodLive.dataset['empty'] = 'false';
+  ahaPeriodLive.innerHTML =
+    `<span class="aha__live-label">This run:</span>` +
+    `<span class="aha__live-text">` +
+    `base <code>a = ${d.a}</code>, period <code>r = ${d.r}</code> (even ✓). ` +
+    `Then <code>a<sup>r/2</sup> = ${d.a}<sup>${halfExp}</sup> mod ${N} = ${d.half}</code>, so ` +
+    `<code>gcd(${d.half}−1, ${N}) = gcd(${minus}, ${N}) = <span class="aha__live-hit">${d.p}</span></code> and ` +
+    `<code>gcd(${d.half}+1, ${N}) = gcd(${plus}, ${N}) = <span class="aha__live-hit">${d.q}</span></code>. ` +
+    `Check: <code>${d.p} × ${d.q} = ${N}</code> ✓` +
+    `</span>`;
+}
+
+function resetAhaPeriod(): void {
+  ahaPeriodLive.dataset['empty'] = 'true';
+  ahaPeriodLive.innerHTML =
+    `<span class="aha__live-label">This run:</span>` +
+    `<span class="aha__live-text">run the algorithm and the exact numbers from your factorisation appear here.</span>`;
+}
+
+// ── Stage banner: a one-line 'what just happened / what's next' between the
+// three teaching stages of a run, so the learner absorbs periodicity → QFT →
+// recovery in order rather than all at once. Inserted into the step log.
+function appendStageBanner(now: string, next: string): void {
+  const b = document.createElement('div');
+  b.className = 'stage-banner';
+  b.setAttribute('role', 'note');
+  b.innerHTML = `<span class="stage-banner__now">✓ ${now}</span> — <span class="stage-banner__next">next: ${next}</span>`;
+  stepLog.querySelector('.step-log__placeholder')?.remove();
+  stepLog.appendChild(b);
+  stepLog.scrollTop = stepLog.scrollHeight;
 }
 
 // ── Extract last chosen 'a' from steps ──────────────────────────────────
@@ -242,6 +441,7 @@ async function handleRun(): Promise<void> {
   isRunning = true;
   lastA = null;
   vizSections = {};
+  resetAhaPeriod();
   stepLog.innerHTML = `<div style="color:var(--text-dim);margin-bottom:0.5rem">━━━ SHOR'S ALGORITHM: N = ${N} ━━━</div>`;
   vizPanel.innerHTML = '<p class="viz-panel__placeholder">Computing…</p>';
   runBtn.disabled = true;
@@ -262,6 +462,30 @@ async function handleRun(): Promise<void> {
       }
       renderStep(step, N);
       await delay(STEP_DELAY);
+
+      // Progressive pacing: after each teaching stage completes, drop a one-line
+      // 'what just happened / what's next' banner and pause a beat before the
+      // next stage's panel populates, so periodicity → QFT → recovery land in order.
+      if (myToken !== runToken) return;
+      if (step.label === 'Period table') {
+        appendStageBanner(
+          'Stage 1 — found the repeating pattern of f(x) = aˣ mod N',
+          'Stage 2 — the QFT turns that period into a measurable frequency (watch the phasor wheels)'
+        );
+        await delay(STEP_DELAY);
+      } else if (step.label === 'QFT distribution') {
+        appendStageBanner(
+          'Stage 2 — measured a frequency spike at a multiple of Q/r',
+          'Stage 3 — continued fractions turn that noisy m/Q back into the clean period r'
+        );
+        await delay(STEP_DELAY);
+      } else if (step.label === 'Continued fractions') {
+        appendStageBanner(
+          'Stage 3 — recovered the period r',
+          'the payoff — gcd(a^(r/2) ± 1, N) peels off the factors (see explainer 1 above)'
+        );
+        await delay(STEP_DELAY);
+      }
     }
     if (myToken !== runToken) return;
 
@@ -315,6 +539,7 @@ resetBtn.addEventListener('click', () => {
   vizPanel.innerHTML = '<p class="viz-panel__placeholder">Visualization will appear here after running the algorithm.</p>';
   vizSections = {};
   lastA = null;
+  resetAhaPeriod();
   runBtn.disabled = false;
   setError('');
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));

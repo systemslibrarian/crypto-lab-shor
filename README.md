@@ -4,6 +4,17 @@
 
 Shor's algorithm (Peter Shor, 1994) is a quantum algorithm that factors integers in polynomial time O((log N)³), rendering RSA, ECC, and all discrete-logarithm-based cryptosystems insecure against a sufficiently large quantum computer. This demo simulates the complete algorithm — classical pre-checks, modular exponentiation period finding, Quantum Fourier Transform probability distribution, continued fraction extraction, and GCD-based factor recovery — entirely in the browser with no backends. The security model it breaks is asymmetric public-key cryptography; it does not threaten symmetric ciphers or hash functions beyond Grover's quadratic speedup.
 
+Beyond executing the steps, the demo is built to teach the two leaps that make Shor click: **why knowing the period `r` factors `N`** (an always-visible explainer walks `aʳ ≡ 1 → (a^(r/2)−1)(a^(r/2)+1) ≡ 0 → gcd(a^(r/2)±1, N)`, with the actual numbers from your run substituted in), and **why the QFT concentrates probability at multiples of `Q/r`** (animated *phasor wheels* draw the rotating phase of each comb entry so you can watch them constructively add at `k·Q/r` and cancel elsewhere — the real interference `|Σ eⁱᶲ|²`, not a pre-plotted curve). Every quantum step is labelled **(classically simulated)** so a browser demo can teach a quantum algorithm without ever implying real quantum speedup.
+
+## Exhibits
+
+1. **Two "aha" explainers** (always visible) — *why the period factors N* and *why the QFT peaks at k·Q/r*; explainer 1 fills in the live `a, r, a^(r/2)`, and both gcds from your factorisation the moment factors are found.
+2. **Algorithm step log** — every classical and (classically simulated) quantum step, with stage banners that pace the reveal: periodicity → QFT → recovery. The gcd "Factors found" step is highlighted as the conceptual payoff.
+3. **Period table** — the bar chart of `f(x) = aˣ mod N` showing the repeating pattern of period `r`.
+4. **QFT distribution + phasor wheels** — the measurement distribution peaking at `k·Q/r`, plus clock-hand phasors you can retune to an on-peak or off-peak frequency to *see* the interference that creates the peaks.
+5. **Continued-fraction extraction** — captioned to explain that the noisy `m/Q` is turned back into the clean period `r`; the winning convergent row is linked by colour to the sampled QFT point.
+6. **RSA Impact panel** — classical-vs-quantum complexity on a true log₁₀ axis, quantum resource estimates for real key sizes, and what survives Shor.
+
 ## When to Use It
 
 - **Understanding why RSA and ECC break** — the demo walks through the period-finding insight that connects modular arithmetic to quantum phase estimation, making the threat concrete rather than abstract.
