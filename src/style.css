@@ -704,8 +704,9 @@ a:focus-visible {
   margin-bottom: 0.5rem;
 }
 .complexity-label { color: var(--text-dim); }
-/* Bars share the same 1fr track, so their inline widths (100% vs 39.1%) are
-   to scale against one another — a true log-axis comparison. */
+/* Bars share the same 1fr track, so their inline widths (100% vs 26.5%) are
+   to scale against one another — a true log-axis comparison: 34 units of
+   exponent for classical GNFS, 9 for Shor. */
 .complexity-bar {
   height: 16px;
   border-radius: 2px;
