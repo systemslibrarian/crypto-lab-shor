@@ -140,12 +140,15 @@ export async function runShor(
   const Q = 1 << (2 * L); // Q = 2^(2L) — as a regular number (safe for L <= 14)
   const Qn = BigInt(Q);
 
-  // Qubit count for display: 3 * ceil(log2(N)) + 3
-  const qubitCount = 3 * L + 3;
+  // Logical qubit count for display: Beauregard's 2n+3 circuit
+  // (Beauregard, "Circuit for Shor's algorithm using 2n+3 qubits", 2002/2003).
+  // This is the same accounting the RSA Impact table on the page uses, which is
+  // why RSA-2048 shows ~4,100 logical qubits there and not ~6,100.
+  const qubitCount = 2 * L + 3;
 
   emit({
     label: 'Resource estimate',
-    description: `Register size Q = 2^(2·${L}) = ${Q}. Required qubits: 3·⌈log₂(${N})⌉ + 3 = ${qubitCount} (classically simulated).`,
+    description: `Register size Q = 2^(2·${L}) = ${Q}. Logical qubits: 2·⌈log₂(${N})⌉ + 3 = ${qubitCount}, using Beauregard's 2n+3 circuit (classically simulated).`,
     data: { L, Q, qubitCount },
     success: true
   });
@@ -205,11 +208,14 @@ export async function runShor(
     // then recover the order from the sampled phase via continued fractions —
     // re-sampling when a measurement lands on an unhelpful peak (k sharing a
     // factor with r), exactly as a real run would.
-    const dist = computeQFTDistribution(Number(r), Q);
     const peakList = Array.from({ length: Math.min(Number(r), 8) }, (_, k) => Math.round((k * Q) / Number(r)));
     const peakStr = peakList.join(', ') + (Number(r) > 8 ? ', …' : '');
+    // The chart shows at most the first 48 peaks, but the measurement is drawn
+    // from all r of them, so the sampled outcome is passed in explicitly to
+    // guarantee it has a bar the UI can highlight.
+    const distFor = (m: number) => computeQFTDistribution(Number(r), Q, 48, [m]);
 
-    let measuredM = sampleQFTMeasurement(dist);
+    let measuredM = sampleQFTMeasurement(Number(r), Q);
     let convergents = continuedFractionConvergents(BigInt(measuredM), Qn, N);
     let recovered = convergents.find(c => c.den >= 2n && modPow(a, c.den, N) === 1n)?.den ?? null;
 
@@ -217,61 +223,82 @@ export async function runShor(
       emit({
         label: 'QFT measurement',
         description: `Sampled m = ${measuredM} → phase ${measuredM}/${Q}. Continued fractions gave no denominator with ${a}^r ≡ 1 mod ${N} (peak shared a factor with r) — re-running the quantum measurement.`,
-        data: { distribution: dist, measured: measuredM, Q, r: Number(r) },
+        data: { distribution: distFor(measuredM), measured: measuredM, Q, r: Number(r) },
         success: false,
         retryReason: 'measurement not useful'
       });
-      measuredM = sampleQFTMeasurement(dist);
+      measuredM = sampleQFTMeasurement(Number(r), Q);
       convergents = continuedFractionConvergents(BigInt(measuredM), Qn, N);
       recovered = convergents.find(c => c.den >= 2n && modPow(a, c.den, N) === 1n)?.den ?? null;
     }
 
     emit({
       label: 'QFT distribution',
-      description: `(Simulated) Register Q = ${Q}; the distribution peaks at m = ${peakStr}. Sampled measurement m = ${measuredM}, phase ${measuredM}/${Q}.`,
-      data: { distribution: dist, measured: measuredM, Q, r: Number(r) },
+      description: `(Simulated) Register Q = ${Q}; the distribution has ${r} equiprobable peaks at m = ${peakStr}${Number(r) > 48 ? ' (chart shows the first 48)' : ''}. Sampled measurement m = ${measuredM}, phase ${measuredM}/${Q}.`,
+      data: { distribution: distFor(measuredM), measured: measuredM, Q, r: Number(r) },
       success: true
     });
 
+    // Everything downstream runs on the period the post-processing actually
+    // recovered from the sampled measurement — not on the classically computed
+    // r. If the convergents never yielded one, the run is abandoned and a fresh
+    // base is drawn, which is what a real run would do; the demo does not
+    // quietly substitute the order it already knew.
+    if (recovered === null) {
+      emit({
+        label: 'Continued fractions',
+        description: `Phase ${measuredM}/${Q}: no convergent denominator d satisfied ${a}^d ≡ 1 mod ${N} after 6 measurements — every one landed on a peak k with gcd(k, r) > 1. The period was not recovered, so this base is discarded. Retrying with a different a.`,
+        data: { convergents, chosenR: null, m: measuredM, Q: Qn },
+        success: false,
+        retryReason: 'period not recovered'
+      });
+      continue;
+    }
+
+    const rUsed = recovered;
+
     emit({
       label: 'Continued fractions',
-      description: recovered !== null
-        ? `Phase ${measuredM}/${Q} → convergents → r = ${recovered} (verified ${a}^${recovered} ≡ 1 mod ${N} ✓).`
-        : `Phase ${measuredM}/${Q}: convergents inconclusive after several measurements; proceeding with the simulated order r = ${r}.`,
-      data: { convergents, chosenR: recovered ?? r, m: measuredM, Q: Qn },
+      description: `Phase ${measuredM}/${Q} → convergents → r = ${rUsed} (verified ${a}^${rUsed} ≡ 1 mod ${N} ✓).`,
+      data: { convergents, chosenR: rUsed, m: measuredM, Q: Qn },
       success: true
     });
 
     // ── Factor extraction ─────────────────────────────────────────────────
 
-    if (r % 2n !== 0n) {
-      emit({ label: 'Bad period', description: `r = ${r} is odd — cannot compute a^(r/2). Retrying with different a.`, data: { a, r }, success: false, retryReason: 'odd r' });
+    if (rUsed % 2n !== 0n) {
+      emit({ label: 'Bad period', description: `r = ${rUsed} is odd — cannot compute a^(r/2). Retrying with different a.`, data: { a, r: rUsed }, success: false, retryReason: 'odd r' });
       continue;
     }
 
-    const half = modPow(a, r / 2n, N);
+    const half = modPow(a, rUsed / 2n, N);
 
     if (half === N - 1n) {
-      emit({ label: 'Bad period', description: `a^(r/2) = ${half} ≡ -1 (mod ${N}) — trivial square root. Retrying with different a.`, data: { a, r, half }, success: false, retryReason: 'trivial square root' });
+      emit({ label: 'Bad period', description: `a^(r/2) = ${half} ≡ -1 (mod ${N}) — trivial square root. Retrying with different a.`, data: { a, r: rUsed, half }, success: false, retryReason: 'trivial square root' });
       continue;
     }
 
     const p = gcd(half - 1n, N);
     const q = gcd(half + 1n, N);
 
-    const success = p > 1n && q > 1n && p * q === N;
+    // A non-trivial gcd is the win condition. p·q = N only when N is a product
+    // of exactly two primes; for N with more factors (e.g. 105) Shor still
+    // returns a genuine non-trivial divisor, so report the split it found.
+    const divisor = p > 1n && p < N ? p : (q > 1n && q < N ? q : null);
+    const success = divisor !== null;
+    const cofactor = divisor !== null ? N / divisor : null;
 
     emit({
-      label: 'Factors found',
+      label: success ? 'Factors found' : 'Factor extraction failed',
       description: success
-        ? `gcd(${half}−1, ${N}) = ${p}, gcd(${half}+1, ${N}) = ${q}. Verification: ${p} × ${q} = ${N} ✓`
-        : `gcd(${half}−1, ${N}) = ${p}, gcd(${half}+1, ${N}) = ${q}. Factor extraction failed — retrying.`,
-      data: { a, r, half, p, q },
+        ? `gcd(${half}−1, ${N}) = ${p}, gcd(${half}+1, ${N}) = ${q}. Verification: ${divisor} × ${cofactor} = ${divisor! * cofactor!} ✓`
+        : `gcd(${half}−1, ${N}) = ${p}, gcd(${half}+1, ${N}) = ${q}. Both gcds are trivial — retrying with a different a.`,
+      data: { a, r: rUsed, half, p, q },
       success
     });
 
     if (success) {
-      factors = [p, q];
+      factors = [divisor!, cofactor!];
       break;
     }
   }
