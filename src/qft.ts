@@ -11,8 +11,8 @@
 /**
  * Compute the QFT measurement probability distribution for Shor's algorithm.
  *
- * For order r and register size Q = 2^(2L):
- *   P(m) ∝ |sin(π·m·r/Q)|² / |sin(π·m/Q)|²
+ * For order r, register size Q = 2^(2L), and M = ⌊Q/r⌋ terms in the sum:
+ *   P(m) = (1/(Q·M)) · |sin(π·M·m·r/Q)|² / |sin(π·m·r/Q)|²
  * Peaks sharply at m = k·Q/r for k = 0,1,...,r-1.
  *
  * For large Q, we only compute near expected peaks (within ±4 of k·Q/r)
@@ -36,11 +36,15 @@ export function computeQFTDistribution(
   const M = Math.floor(Q / r);
 
   /**
-   * P(m) = (1/Q) * |Σ_{j=0}^{M-1} e^{2πi·j·m·r/Q}|²
+   * P(m) = (1/(Q·M)) * |Σ_{j=0}^{M-1} e^{2πi·j·m·r/Q}|²
    *
    * For integer m with alpha = m*r/Q:
-   *   If alpha is an integer (exact peak): |Σ|² = M²  → P = M²/Q
-   *   Otherwise: |Σ|² = sin²(π·M·alpha) / sin²(π·alpha) → P = that/Q
+   *   If alpha is an integer (exact peak): |Σ|² = M²  → P = M/Q
+   *   Otherwise: |Σ|² = sin²(π·M·alpha) / sin²(π·alpha) → P = that/(Q·M)
+   *
+   * The values returned below drop the constant 1/M factor (the shape is what
+   * the chart and the sampler need) and are renormalised over the sampled
+   * window before use.
    *
    * In practice for integer m, alpha is integer iff m*r ≡ 0 (mod Q).
    * We handle the limit explicitly to avoid 0/0.
