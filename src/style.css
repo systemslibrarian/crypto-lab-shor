@@ -7,6 +7,14 @@
   --bg-panel: #0d1117;
   --bg-panel-2: #111820;
   --border: #1e2a3a;
+  /* Control boundaries only (WCAG 2.1 SC 1.4.11). The N field is filled with
+     --bg-panel-2 (#111820), which is 1.23:1 against --bg and 1.10:1 against
+     --bg-panel, so the border is the only thing delineating the control.
+     #636d7d keeps the palette's blue neutral and clears 3:1 on every surface
+     the field sits on: 3.74:1 on --bg, 3.62:1 on --bg-panel, 3.42:1 on
+     --bg-panel-2. --border is left unchanged for decorative rules — panel
+     outlines, dividers, the phasor circles. */
+  --border-strong: #636d7d;
   --text: #c9d1d9;
   --text-dim: #8b949e;
   --text-bright: #f0f6fc;
@@ -27,6 +35,9 @@
   --bg-panel: #ffffff;
   --bg-panel-2: #eef1f7;
   --border: #d0d7de;
+  /* Same fix, other direction: 3.53:1 on --bg, 3.82:1 on --bg-panel, 3.38:1
+     on --bg-panel-2. */
+  --border-strong: #7b8391;
   --text: #24292f;
   --text-dim: #57606a;
   --text-bright: #0d1117;
@@ -234,7 +245,7 @@ a:hover { text-decoration: underline; }
 .input-label { color: var(--text-dim); white-space: nowrap; }
 .n-input {
   background: var(--bg-panel-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   color: var(--text-bright);
   border-radius: var(--radius);
   padding: 0.4rem 0.6rem;
