@@ -21,7 +21,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm run preview -- --port ${PORT} --strictPort`,
+    // Build before serving. `preview` only serves whatever is already in dist/,
+    // so a failed build would leave the last good bundle on disk and the suite
+    // would pass green against source that no longer compiles.
+    command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}${BASE}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
