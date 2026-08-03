@@ -51,7 +51,25 @@ git clone https://github.com/systemslibrarian/crypto-lab-shor
 cd crypto-lab-shor
 npm install
 npm run dev
+npm test           # arithmetic + Shor engine unit tests
+npm run test:e2e   # Playwright: functional claims + WCAG 2.1 AA gate
 ```
+
+`npm run test:e2e` (and `test:a11y`, the same run) builds first and serves the production
+bundle, so what is driven is what ships.
+
+**Functional browser gate:** `e2e/claims.spec.ts` drives the built page and asserts the
+numbers each panel puts on screen — checked against each other and against the modular
+arithmetic redone inside the test, not against constants. The factors in the result banner
+must multiply to N and must be the two gcds the live explainer derived, whose `a^(r/2)` is
+recomputed from the base and period it names; the period chart's bars must genuinely be
+`a^x mod N` and must repeat with exactly the period its heading claims, with r the *least*
+such period; the QFT peaks must sit at `k·Q/r` with exactly one bar marked as the
+measurement everything else names; the phasors must sum to the full hand count on-peak and
+collapse off it; and the convergent the table crowns must be the first denominator that
+really satisfies `a^r ≡ 1 (mod N)`. Every non-quantum path is asserted to reach its state
+*and* name its cause — even N, perfect powers, primes, out-of-range input, and each retry
+reason. Uncaught page exceptions fail the run.
 
 ## Related Demos
 

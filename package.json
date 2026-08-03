@@ -10,6 +10,7 @@
     "test": "node --import tsx --test test/arithmetic.test.ts test/shor.test.ts",
     "typecheck": "tsc --noEmit",
     "test:a11y": "playwright test",
+    "test:e2e": "playwright test",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "devDependencies": {

@@ -106,6 +106,20 @@ function renderStep(step: ShorStep, N: bigint): void {
 // ── Panel B visualizations ───────────────────────────────────────────────
 let vizSections: Record<string, HTMLElement> = {};
 
+/**
+ * Which retry attempt the charts being rendered belong to.
+ *
+ * Shor retries with a fresh base whenever a run hits an odd period, a trivial
+ * square root, or an unhelpful measurement, and every attempt emits its own
+ * period table, QFT distribution and convergents. Keying the viz sections on
+ * this counter keeps each section's title — which names that attempt's a, r, Q
+ * and phase — describing the charts actually inside it. Sharing one section per
+ * kind stacked every attempt's chart under the first attempt's heading, so a
+ * panel titled "f(x) = 133^x mod 143 — period r = 3" also held the a = 125,
+ * r = 20 chart that actually produced the factors.
+ */
+let vizAttempt = 0;
+
 function getVizSection(id: string, title: string): HTMLElement {
   if (vizSections[id]) return vizSections[id];
   vizPanel.querySelector('.viz-panel__placeholder')?.remove();
@@ -124,7 +138,7 @@ function getVizSection(id: string, title: string): HTMLElement {
 function renderViz(step: ShorStep, N: bigint): void {
   if (step.label === 'Period table') {
     const data = step.data as { table: Array<{x:number; fx:number}>; period: number; a: number; N: number };
-    const sec = getVizSection('period', `f(x) = ${data.a}^x mod ${data.N}  —  period r = ${data.period}`);
+    const sec = getVizSection(`period-${vizAttempt}`, `f(x) = ${data.a}^x mod ${data.N}  —  period r = ${data.period}`);
     const container = document.createElement('div');
     container.className = 'period-bars';
     // The chart is a single labelled image; the container is keyboard-focusable
@@ -155,7 +169,7 @@ function renderViz(step: ShorStep, N: bigint): void {
 
   if (step.label === 'QFT distribution') {
     const data = step.data as { distribution: Array<{m:number; probability:number; peak:boolean}>; measured: number; Q: number; r: number };
-    const sec = getVizSection('qft', `QFT probability distribution  (classically simulated)  —  Q = ${data.Q},  r = ${data.r}`);
+    const sec = getVizSection(`qft-${vizAttempt}`, `QFT probability distribution  (classically simulated)  —  Q = ${data.Q},  r = ${data.r}`);
     const wrapper = document.createElement('div');
     wrapper.className = 'qft-bars-wrapper';
     // Focusable so keyboard users can scroll the chart (WCAG 2.1.1).
@@ -194,7 +208,7 @@ function renderViz(step: ShorStep, N: bigint): void {
   if (step.label === 'Continued fractions') {
     const data = step.data as { convergents: Array<{num:bigint; den:bigint}>; chosenR: bigint; m: number|bigint; Q: bigint };
     const a = extractA();
-    const sec = getVizSection('cf', `Continued Fraction Extraction  —  phase ${data.m} / ${data.Q}`);
+    const sec = getVizSection(`cf-${vizAttempt}`, `Continued Fraction Extraction  —  phase ${data.m} / ${data.Q}`);
 
     // Plain-language purpose + the visual bridge from the sampled QFT point.
     const caption = document.createElement('p');
@@ -441,6 +455,7 @@ async function handleRun(): Promise<void> {
   isRunning = true;
   lastA = null;
   vizSections = {};
+  vizAttempt = 0;
   resetAhaPeriod();
   stepLog.innerHTML = `<div style="color:var(--text-dim);margin-bottom:0.5rem">━━━ SHOR'S ALGORITHM: N = ${N} ━━━</div>`;
   vizPanel.innerHTML = '<p class="viz-panel__placeholder">Computing…</p>';
@@ -459,6 +474,7 @@ async function handleRun(): Promise<void> {
       if (step.label === 'Random base' || step.label === 'Lucky GCD') {
         const data = step.data as { a?: bigint };
         if (data?.a !== undefined) lastA = data.a;
+        if (step.label === 'Random base') vizAttempt++;
       }
       renderStep(step, N);
       await delay(STEP_DELAY);
@@ -538,6 +554,7 @@ resetBtn.addEventListener('click', () => {
   stepLog.innerHTML = '<p class="step-log__placeholder">Enter N and press ▶ Run Shor\'s Algorithm to begin.</p>';
   vizPanel.innerHTML = '<p class="viz-panel__placeholder">Visualization will appear here after running the algorithm.</p>';
   vizSections = {};
+  vizAttempt = 0;
   lastA = null;
   resetAhaPeriod();
   runBtn.disabled = false;
