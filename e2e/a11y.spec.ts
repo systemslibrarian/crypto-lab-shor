@@ -1,91 +1,30 @@
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { test } from '@playwright/test';
+import { boot, driveAllStates, NARROW } from './gate';
 
 /**
- * Strict WCAG regression gate for the Shor's Algorithm demo.
+ * WCAG A/AA regression gate for the Shor's Algorithm demo.
  *
- * The page is server-rendered HTML with a live demo driven by main.ts. Running
- * the algorithm injects the step log, the period/QFT bar charts, and the
- * continued-fraction table (all dynamically created). So we DRIVE the demo
- * (Run on a semiprime that requires quantum order-finding, e.g. N=15), wait for
- * the visualization + result banner, open every <details>, neutralize motion,
- * then scan — in both themes.
+ * The invalid-input alert, a classically resolved N, a prime N, a full quantum
+ * run (step log, period bars, QFT distribution, phasor wheels, convergents
+ * table), every phasor frequency including the cancelling one, both disclosure
+ * configurations, a preset-driven run and the reset state are scanned in both
+ * themes at desktop and phone width.
+ *
+ * See `gate.ts` for why nothing is injected into the page, why each scan
+ * asserts its content first, and why `violations` is not the whole oracle.
  */
 
-const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+for (const theme of ['dark', 'light'] as const) {
+  test(`no WCAG A/AA violations in ${theme} theme`, async ({ page }) => {
+    test.setTimeout(900_000);
+    await boot(page, theme);
+    await driveAllStates(page, theme);
+  });
 
-// Neutralize animation/transition/opacity so mid-flight states (bar fade-in,
-// the pulsing sampled-QFT bar) can't hide text/fills from the contrast checker.
-async function killMotion(page: Page): Promise<void> {
-  await page.addStyleTag({
-    content: `*,*::before,*::after{
-      animation-duration:0s!important;animation-delay:0s!important;
-      transition-duration:0s!important;transition-delay:0s!important;scroll-behavior:auto!important;
-    }`,
+  test(`no WCAG A/AA violations in ${theme} theme at 380px`, async ({ page }) => {
+    test.setTimeout(900_000);
+    await page.setViewportSize(NARROW);
+    await boot(page, theme);
+    await driveAllStates(page, `${theme} @380px`);
   });
 }
-
-async function expandAll(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    for (const d of document.querySelectorAll('details')) (d as HTMLDetailsElement).open = true;
-    for (const el of document.querySelectorAll<HTMLElement>('[hidden]')) el.removeAttribute('hidden');
-  });
-}
-
-// Run the algorithm on a semiprime that needs real order-finding → produces the
-// period table, QFT distribution + phasor wheels, and continued-fraction table.
-// Shor is randomized: a run can short-circuit via a "Lucky GCD" (the base shares
-// a factor with N) and emit no quantum visualization. That is correct behavior,
-// not a bug — so we re-run until a run actually exercises the quantum path and
-// injects the viz sections, then scan that fully-populated DOM.
-async function driveDemo(page: Page): Promise<void> {
-  await page.locator('#n-input').fill('143'); // 11 × 13 — lower Lucky-GCD odds than 15
-  for (let attempt = 0; attempt < 12; attempt++) {
-    await expect(page.locator('#run-btn')).toBeEnabled({ timeout: 30_000 });
-    await page.locator('#run-btn').click();
-    // Result banner appears once the run completes.
-    await expect(page.locator('.result-banner')).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator('#run-btn')).toBeEnabled({ timeout: 30_000 });
-    // Did this run take the quantum path (period/QFT/CF viz rendered)?
-    if (await page.locator('#viz-panel .viz-section').first().isVisible()) return;
-    // Lucky-GCD short-circuit — reset and try a fresh base.
-    await page.locator('#reset-btn').click();
-  }
-  // Guarantee the assertion (and a clear failure) if we never hit the quantum path.
-  await expect(page.locator('#viz-panel .viz-section').first()).toBeVisible({ timeout: 30_000 });
-}
-
-async function scan(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
-  const summary = results.violations.map((v) => ({
-    id: v.id,
-    impact: v.impact,
-    help: v.help,
-    nodes: v.nodes.map((n) => n.target.join(' ')).slice(0, 5),
-  }));
-  expect(summary).toEqual([]);
-}
-
-test.beforeEach(async ({ page }) => {
-  await page.goto('.');
-  await expect(page.locator('#cl-theme-toggle')).toBeVisible();
-  await expect(page.locator('#run-btn')).toBeVisible();
-  await killMotion(page);
-});
-
-test('no WCAG A/AA violations in dark theme (demo driven)', async ({ page }) => {
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await driveDemo(page);
-  await killMotion(page);
-  await expandAll(page);
-  await scan(page);
-});
-
-test('no WCAG A/AA violations in light theme (demo driven)', async ({ page }) => {
-  await page.locator('#cl-theme-toggle').click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await driveDemo(page);
-  await killMotion(page);
-  await expandAll(page);
-  await scan(page);
-});

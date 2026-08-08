@@ -81,9 +81,19 @@ async function textOf(locator: Locator): Promise<string> {
  * Run N and wait for the banner. Shor is randomised: a run can short-circuit
  * on a lucky gcd and emit no quantum visualisation, which is correct behaviour.
  * Retry until a run takes the quantum path, exactly as the a11y suite does.
+ *
+ * A RESULT banner alone does NOT mean the quantum path finished the job. A
+ * lucky gcd can land on the LAST attempt, after earlier attempts have already
+ * drawn their charts: `.viz-section` then exists, the banner reads RESULT, and
+ * yet no period was used — so no convergent is crowned and `#aha-period-live`
+ * stays empty. Every caller below assumes the opposite, and this helper's own
+ * docblock claimed that guarantee while the condition did not check it, which
+ * is why the suite went intermittently red on whichever assertion happened to
+ * depend on it that run. Require the explainer to be populated, which is only
+ * true when the run finished through order finding.
  */
 async function runQuantum(page: Page, n: number, minAttempts = 1): Promise<void> {
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 40; i++) {
     await expect(page.locator('#run-btn')).toBeEnabled({ timeout: 30_000 });
     await page.locator('#n-input').fill(String(n));
     await page.locator('#run-btn').click();
@@ -91,10 +101,12 @@ async function runQuantum(page: Page, n: number, minAttempts = 1): Promise<void>
     await expect(page.locator('#run-btn')).toBeEnabled({ timeout: 30_000 });
     const bases = await page.locator('.step-entry').filter({ hasText: 'Random base' }).count();
     const factored = await page.locator('.result-banner').innerText();
-    if (bases >= minAttempts && /RESULT:/.test(factored)) return;
+    const viaPeriod =
+      (await page.locator('#aha-period-live').getAttribute('data-empty')) === 'false';
+    if (bases >= minAttempts && /RESULT:/.test(factored) && viaPeriod) return;
     await page.locator('#reset-btn').click();
   }
-  throw new Error(`no run with >= ${minAttempts} order-finding attempts after 30 tries`);
+  throw new Error(`no run with >= ${minAttempts} order-finding attempts after 40 tries`);
 }
 
 interface Banner {
@@ -496,7 +508,16 @@ test('retries get their own charts, each under a heading that describes it', asy
       /↺ Retrying: (odd r|trivial square root|order not found|measurement not useful|period not recovered)/,
     );
   }
-  await expect(page.locator('.step-entry--failure').first()).toContainText('[FAIL]');
+  // ...and where the reason is one the classifier treats as a failed step, the
+  // entry carries the [FAIL] tag. Scoped deliberately: 'measurement not useful'
+  // hangs off a 'QFT measurement' step and 'period not recovered' off a
+  // 'Continued fractions' step, neither of which `classifyStep` tags [FAIL].
+  // Asserting a [FAIL] entry unconditionally made this test depend on which of
+  // the five retry reasons the run happened to draw.
+  const FAIL_TAGGED = ['odd r', 'trivial square root', 'order not found'];
+  if (retries.some((r) => FAIL_TAGGED.some((reason) => flat(r).includes(reason)))) {
+    await expect(page.locator('.step-entry--failure').first()).toContainText('[FAIL]');
+  }
 });
 
 // ---------------------------------------------------------------------------

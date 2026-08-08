@@ -306,9 +306,17 @@
       <!-- ── Panel A — Algorithm Steps ─────────────────────────────── -->
       <section class="panel panel-a" aria-label="Algorithm step log">
         <div class="panel__header">ALGORITHM STEPS</div>
+        <!-- role="log": a live-updating, scrollable console. Without a role
+             this is a generic div, and `aria-label` is PROHIBITED on generic —
+             browsers discard it silently and axe files it under `incomplete`,
+             so the name never reached anyone. `log` also carries an implicit
+             `aria-live="polite"`, which is what the attribute below was doing
+             by hand. `tabindex="0"` keeps the scroller keyboard-operable
+             (WCAG 2.1.1) now that it is a named region rather than a div. -->
         <div
           id="step-log"
           class="step-log"
+          role="log"
           aria-live="polite"
           aria-label="Algorithm step log"
           tabindex="0"
