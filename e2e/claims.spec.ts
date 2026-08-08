@@ -20,13 +20,24 @@ test.beforeEach(async ({ page }) => {
   const errors: string[] = [];
   pageErrors.set(page, errors);
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+  // The bar charts fade in one bar at a time, and waiting that out on every
+  // assertion would be slow. Ask for it the way a reader does rather than
+  // forcing it off: `renderStep` reads `prefers-reduced-motion` once at load
+  // and, when it is set, never applies the inline `opacity: 0` in the first
+  // place. This must precede `goto` because that read happens at module load.
+  //
+  // It replaces a blanket `*{opacity:1!important}` style tag. That tag made
+  // every claim below true of a page no visitor sees: partial opacity is real
+  // rendering, and overriding it means the suite asserted against a document
+  // the lab never produces. Do not reintroduce it — if something here needs a
+  // bar settled, wait for the bar.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('.');
+  expect(
+    await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
+    'reduced motion must actually be in effect, not merely requested',
+  ).toBe(true);
   await expect(page.locator('#run-btn')).toBeVisible();
-  // The bar charts fade in one bar at a time; nothing here depends on the
-  // animation, and waiting it out on every assertion would be slow.
-  await page.addStyleTag({
-    content: `*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important;opacity:1!important}`,
-  });
 });
 
 test.afterEach(async ({ page }) => {
@@ -93,6 +104,16 @@ async function textOf(locator: Locator): Promise<string> {
  * true when the run finished through order finding.
  */
 async function runQuantum(page: Page, n: number, minAttempts = 1): Promise<void> {
+  // The lab paces its step log at `STEP_DELAY` = 300ms per rendered step, and
+  // how many order-finding attempts a run needs is random, so one run costs
+  // roughly 3s per attempt and this helper may discard several runs before one
+  // meets `minAttempts`. That runs past Playwright's 30s DEFAULT TEST timeout —
+  // which is what actually made this suite intermittently red (measured at
+  // ~1 run in 4 against an untouched HEAD), not the 30s locator waits below.
+  // When the test times out Playwright reports whichever expect was pending,
+  // so the failure read as "`.result-banner` not found" and looked like an app
+  // hang. The a11y gate drives the same runs and already carries a 900s budget.
+  test.setTimeout(300_000);
   for (let i = 0; i < 40; i++) {
     await expect(page.locator('#run-btn')).toBeEnabled({ timeout: 30_000 });
     await page.locator('#n-input').fill(String(n));
