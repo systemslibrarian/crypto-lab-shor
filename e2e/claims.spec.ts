@@ -130,6 +130,32 @@ async function runQuantum(page: Page, n: number, minAttempts = 1): Promise<void>
   throw new Error(`no run with >= ${minAttempts} order-finding attempts after 40 tries`);
 }
 
+/**
+ * The stage-3 banner claims "recovered the period r". The only evidence the
+ * page offers for that is a crowned convergent, so the two must agree exactly:
+ * one banner per attempt whose convergents table has a winner, and none for an
+ * attempt whose table has none.
+ *
+ * Regression: the banner was emitted for every 'Continued fractions' step
+ * regardless of `step.success`, so an attempt whose own log entry said "The
+ * period was not recovered, so this base is discarded" was followed one line
+ * later by "✓ Stage 3 — recovered the period r".
+ */
+async function expectStage3BannersMatchCrownedConvergents(page: Page): Promise<void> {
+  const banners = (await page.locator('.stage-banner').allInnerTexts()).map(flat);
+  const claimed = banners.filter((b) => b.includes('✓ Stage 3 — recovered the period r')).length;
+  const cfSections = page.locator('[id^="viz-cf-"]');
+  const total = await cfSections.count();
+  let crowned = 0;
+  for (let i = 0; i < total; i++) {
+    if ((await cfSections.nth(i).locator('.conv-winner').count()) > 0) crowned++;
+  }
+  expect(
+    claimed,
+    `${claimed} banners claim the period was recovered but only ${crowned} convergents tables crown one`,
+  ).toBe(crowned);
+}
+
 interface Banner {
   n: bigint;
   factors: [bigint, bigint];
@@ -229,7 +255,10 @@ test('a successful run: the banner, the explainer and the gcd step all name one 
   expect(stages.length).toBeGreaterThanOrEqual(3);
   expect(flat(stages[0]!)).toContain('Stage 1 — found the repeating pattern');
   expect(flat(stages[1]!)).toContain('Stage 2 — measured a frequency spike');
-  expect(flat(stages[2]!)).toContain('Stage 3 — recovered the period r');
+  // Deliberately not the full success wording: stage 3 can FAIL on an attempt
+  // (see 'a failed order-finding attempt…' below), and pinning the success
+  // sentence here would make this test depend on which retry path the run drew.
+  expect(flat(stages[2]!)).toContain('Stage 3 —');
 });
 
 // ---------------------------------------------------------------------------
@@ -539,6 +568,8 @@ test('retries get their own charts, each under a heading that describes it', asy
   if (retries.some((r) => FAIL_TAGGED.some((reason) => flat(r).includes(reason)))) {
     await expect(page.locator('.step-entry--failure').first()).toContainText('[FAIL]');
   }
+
+  await expectStage3BannersMatchCrownedConvergents(page);
 });
 
 // ---------------------------------------------------------------------------
@@ -641,6 +672,188 @@ test('reset clears the log, the charts and the live explainer', async ({ page })
   );
   await expect(page.locator('#run-btn')).toBeEnabled();
   await expect(page.locator('.preset-btn.active')).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------
+// The attempt that fails
+// ---------------------------------------------------------------------------
+
+/**
+ * Pin every random draw to zero before the page loads.
+ *
+ * `cryptoRandomBigInt` then always picks a = 2 and `sampleQFTMeasurement`
+ * always returns the k = 0 peak's dm = -4 offset, so for N = 15 (r = 4,
+ * Q = 256) every measurement is m = 252, whose convergents are 0/1 and 1/1 —
+ * no denominator ≥ 2, so six measurements in a row recover nothing and the
+ * attempt is discarded. That is the real 'period not recovered' branch (53 of
+ * 720 unseeded engine runs hit it), made reproducible rather than simulated.
+ */
+async function pinRandomnessToZero(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const fill = <T extends ArrayBufferView>(buf: T): T => {
+      new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength).fill(0);
+      return buf;
+    };
+    crypto.getRandomValues = fill as typeof crypto.getRandomValues;
+  });
+  await page.goto('.');
+  await expect(page.locator('#run-btn')).toBeVisible();
+}
+
+test('a failed order-finding attempt does not claim it recovered the period', async ({ page }) => {
+  test.setTimeout(120_000);
+  await pinRandomnessToZero(page);
+
+  await page.locator('#n-input').fill('15');
+  await page.locator('#run-btn').click();
+
+  // The state under test: the attempt is discarded because no convergent worked.
+  const retry = page.locator('.step-retry').filter({ hasText: 'period not recovered' }).first();
+  await expect(retry).toBeVisible({ timeout: 60_000 });
+  expect(await textOf(page.locator('#viz-cf-1'))).toBeTruthy();
+  // Scoped to the entry whose LABEL is 'Continued fractions': the preceding
+  // 'QFT measurement' entries mention continued fractions in their prose too.
+  const cfEntry = page
+    .locator('.step-entry')
+    .filter({ has: page.locator('.step-label', { hasText: /^Continued fractions$/ }) })
+    .first();
+  const cfEntryText = await textOf(cfEntry);
+  expect(cfEntryText).toContain('The period was not recovered, so this base is discarded');
+  expect(cfEntryText).toContain('↺ Retrying: period not recovered');
+
+  // The banner that used to contradict it, one line below. It is appended a
+  // `STEP_DELAY` after the entry, so wait for this attempt's three stage
+  // banners rather than reading the log the instant the retry line lands.
+  await expect
+    .poll(() => page.locator('.stage-banner').count(), { timeout: 30_000 })
+    .toBeGreaterThanOrEqual(3);
+  const banners = (await page.locator('.stage-banner').allInnerTexts()).map(flat);
+  expect(
+    banners.filter((b) => b.includes('recovered the period r')),
+    'no banner may claim the period was recovered while the log says it was not',
+  ).toEqual([]);
+  expect(banners.some((b) => b.includes('↺ Stage 3 —') && b.includes('was NOT recovered'))).toBe(true);
+  expect(banners.some((b) => b.includes('next: a fresh base a'))).toBe(true);
+  await expectStage3BannersMatchCrownedConvergents(page);
+
+  // ...and the convergents caption stops promising a highlight that is not there.
+  const cf = page.locator('#viz-cf-1');
+  await expect(cf.locator('.conv-winner')).toHaveCount(0);
+  const caption = await textOf(cf.locator('.cf-caption'));
+  expect(caption).toContain('none of them does');
+  expect(caption).not.toContain('highlighted below');
+  // Every row really does fail the test the caption names: 2^den ≢ 1 mod 15.
+  const rows = await cf.locator('tbody tr').allInnerTexts();
+  expect(rows.length).toBeGreaterThan(0);
+  for (const row of rows) {
+    const den = BigInt(capture(flat(row), /\d+\/(\d+)/, 'denominator'));
+    if (den >= 2n) expect(modPow(2n, den, 15n)).not.toBe(1n);
+  }
+
+  await page.locator('#reset-btn').click();
+});
+
+// ---------------------------------------------------------------------------
+// The RSA-impact call-out
+// ---------------------------------------------------------------------------
+
+test('the live call-out never outlives the run that produced it', async ({ page }) => {
+  test.setTimeout(180_000);
+  const shipped = 'Run the algorithm above to see a live demo.';
+  expect(await textOf(page.locator('#live-callout'))).toContain(shipped);
+
+  await runAndWait(page, '143');
+  const banner = await readBanner(page);
+  expect(await textOf(page.locator('#live-callout'))).toContain(
+    `factored N = 143 → ${banner.factors[0]} × ${banner.factors[1]}`,
+  );
+
+  // Regression: Reset restored the step log, the viz panel and the live
+  // explainer to their placeholders and left this panel asserting 11 × 13.
+  await page.locator('#reset-btn').click();
+  const afterReset = await textOf(page.locator('#live-callout'));
+  expect(afterReset).toContain(shipped);
+  expect(afterReset).not.toContain('factored');
+  expect(afterReset).not.toContain('143');
+
+  // Regression: running a prime next left it naming the PREVIOUS run's N — the
+  // page said "there is nothing to factor" and "this demo factored N = 143" at
+  // the same moment.
+  await runAndWait(page, '143');
+  expect(await textOf(page.locator('#live-callout'))).toContain('factored N = 143');
+  await runAndWait(page, '97');
+  const afterPrime = await textOf(page.locator('#live-callout'));
+  expect(await textOf(page.locator('.result-banner'))).toContain('is prime — there is nothing to factor');
+  expect(afterPrime).toContain(shipped);
+  expect(afterPrime).not.toContain('factored');
+  expect(afterPrime).not.toContain('143');
+});
+
+// ---------------------------------------------------------------------------
+// Shipped defaults
+// ---------------------------------------------------------------------------
+
+test('first paint ships the documented defaults, and every panel says nothing has run', async ({
+  page,
+}) => {
+  await expect(page.locator('#n-input')).toHaveValue('15');
+  await expect(page.locator('.preset-btn.active')).toHaveCount(0);
+  await expect(page.locator('#n-error')).toBeHidden();
+  await expect(page.locator('#run-btn')).toBeEnabled();
+
+  // The two explainers ship open, the ECC detail ships closed.
+  await expect(page.locator('#aha-period')).toHaveAttribute('open', '');
+  await expect(page.locator('#aha-qft')).toHaveAttribute('open', '');
+  await expect(page.locator('.ecc-detail')).not.toHaveAttribute('open', '');
+
+  // Nothing has run, and all four output panels agree about that.
+  await expect(page.locator('.result-banner')).toHaveCount(0);
+  await expect(page.locator('.viz-section')).toHaveCount(0);
+  await expect(page.locator('.step-log__placeholder')).toBeVisible();
+  expect(await textOf(page.locator('#viz-panel'))).toBe(
+    'Visualization will appear here after running the algorithm.',
+  );
+  await expect(page.locator('#aha-period-live')).toHaveAttribute('data-empty', 'true');
+  expect(await textOf(page.locator('#live-callout'))).toContain(
+    'Run the algorithm above to see a live demo.',
+  );
+
+  // The RSA-impact bars are a log10 axis, and their widths must be the
+  // exponents they print: 34/34 and 9/34.
+  const widths = await page
+    .locator('.complexity-bar')
+    .evaluateAll((ns) => ns.map((n) => (n as HTMLElement).style.width));
+  expect(widths).toEqual(['100%', '26.5%']);
+  expect(Math.round((9 / 34) * 1000) / 10).toBe(26.5);
+});
+
+test('a non-integer N is refused, not silently truncated to a different number', async ({ page }) => {
+  // Regression: `parseInt('15.5')` is 15, so the lab factored 15 while the
+  // field read 15.5 and the error copy promised "a whole number".
+  await page.locator('#n-input').fill('15.5');
+  await page.locator('#run-btn').click();
+  await expect(page.locator('#n-error')).toBeVisible();
+  expect(await textOf(page.locator('#n-error'))).toBe(
+    'Please enter a whole number N between 4 and 9999.',
+  );
+  await expect(page.locator('#n-input')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#n-input')).toHaveValue('15.5');
+  // Nothing ran — in particular nothing ran on 15.
+  await expect(page.locator('.result-banner')).toHaveCount(0);
+  await expect(page.locator('.step-log__placeholder')).toBeVisible();
+  expect(await textOf(page.locator('#step-log'))).not.toContain('N = 15');
+});
+
+test('Enter in the input runs the algorithm, and it runs the number in the field', async ({
+  page,
+}) => {
+  await page.locator('#n-input').fill('4');
+  await page.locator('#n-input').press('Enter');
+  await expect(page.locator('.result-banner')).toBeVisible({ timeout: 30_000 });
+  const banner = await readBanner(page);
+  expect(banner.n).toBe(4n);
+  expect(banner.factors).toEqual([2n, 2n]);
+  expect(await textOf(page.locator('#step-log'))).toContain("SHOR'S ALGORITHM: N = 4");
 });
 
 test('presets run the number on the button they were clicked with', async ({ page }) => {

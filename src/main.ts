@@ -206,18 +206,26 @@ function renderViz(step: ShorStep, N: bigint): void {
   }
 
   if (step.label === 'Continued fractions') {
-    const data = step.data as { convergents: Array<{num:bigint; den:bigint}>; chosenR: bigint; m: number|bigint; Q: bigint };
+    const data = step.data as { convergents: Array<{num:bigint; den:bigint}>; chosenR: bigint | null; m: number|bigint; Q: bigint };
     const a = extractA();
     const sec = getVizSection(`cf-${vizAttempt}`, `Continued Fraction Extraction  —  phase ${data.m} / ${data.Q}`);
 
     // Plain-language purpose + the visual bridge from the sampled QFT point.
+    //
+    // The last clause is conditional on `chosenR`, because this same panel is
+    // rendered for the attempt that FAILS: when six measurements in a row land
+    // on a peak k sharing a factor with r, no convergent denominator satisfies
+    // a^d ≡ 1, nothing is crowned and no row is highlighted. Promising a
+    // highlight unconditionally described a table the reader is not looking at.
     const caption = document.createElement('p');
     caption.className = 'cf-caption';
     caption.innerHTML =
       `The measurement gave a noisy fraction <span class="cf-caption__sampled">m/Q = ${data.m}/${data.Q}</span> ` +
       `(the <strong>green sampled bar</strong> above). It is close to some clean <em>k/r</em>, but we don't yet know <em>r</em>. ` +
       `<strong>Continued fractions</strong> expand that decimal into its best simple-fraction approximations (convergents); ` +
-      `the first denominator that passes <span class="cf-caption__sampled">a<sup>r</sup> ≡ 1 (mod N)</span> is the period <em>r</em> — highlighted below.`;
+      (data.chosenR !== null && data.chosenR !== undefined
+        ? `the first denominator that passes <span class="cf-caption__sampled">a<sup>r</sup> ≡ 1 (mod N)</span> is the period <em>r</em> — highlighted below.`
+        : `the period <em>r</em> would be the first denominator that passes <span class="cf-caption__sampled">a<sup>r</sup> ≡ 1 (mod N)</span> — but here <strong>none of them does</strong>, so no row is highlighted and this base is discarded.`);
     sec.appendChild(caption);
 
     const tableWrap = document.createElement('div');
@@ -417,11 +425,18 @@ function resetAhaPeriod(): void {
 // ── Stage banner: a one-line 'what just happened / what's next' between the
 // three teaching stages of a run, so the learner absorbs periodicity → QFT →
 // recovery in order rather than all at once. Inserted into the step log.
-function appendStageBanner(now: string, next: string): void {
+//
+// `mark` exists because stage 3 can fail. The banner was emitted for every
+// 'Continued fractions' step regardless of `step.success`, so an attempt whose
+// own log entry read "The period was not recovered, so this base is discarded"
+// was immediately followed by "✓ Stage 3 — recovered the period r". Two
+// exhibits, same moment, opposite verdicts — and it is not rare: 53 of 720
+// simulated runs hit that path.
+function appendStageBanner(now: string, next: string, mark = '✓'): void {
   const b = document.createElement('div');
   b.className = 'stage-banner';
   b.setAttribute('role', 'note');
-  b.innerHTML = `<span class="stage-banner__now">✓ ${now}</span> — <span class="stage-banner__next">next: ${next}</span>`;
+  b.innerHTML = `<span class="stage-banner__now">${mark} ${now}</span> — <span class="stage-banner__next">next: ${next}</span>`;
   stepLog.querySelector('.step-log__placeholder')?.remove();
   stepLog.appendChild(b);
   stepLog.scrollTop = stepLog.scrollHeight;
@@ -443,8 +458,12 @@ function setError(msg: string): void {
 
 async function handleRun(): Promise<void> {
   if (isRunning) return; // ignore re-entrant triggers (Run, Enter, presets)
-  const raw = parseInt(nInput.value, 10);
-  if (isNaN(raw) || raw < 4 || raw > 9999) {
+  // `Number`, not `parseInt`. `parseInt('15.5')` is 15, so the lab silently
+  // factored a different integer from the one the field was showing while its
+  // own error copy promised "a whole number". A number input keeps '15.5' in
+  // `.value`, so this is reachable by typing.
+  const raw = Number(nInput.value.trim());
+  if (nInput.value.trim() === '' || !Number.isInteger(raw) || raw < 4 || raw > 9999) {
     setError('Please enter a whole number N between 4 and 9999.');
     nInput.focus();
     return;
@@ -457,6 +476,7 @@ async function handleRun(): Promise<void> {
   vizSections = {};
   vizAttempt = 0;
   resetAhaPeriod();
+  resetCallout();
   stepLog.innerHTML = `<div style="color:var(--text-dim);margin-bottom:0.5rem">━━━ SHOR'S ALGORITHM: N = ${N} ━━━</div>`;
   vizPanel.innerHTML = '<p class="viz-panel__placeholder">Computing…</p>';
   runBtn.disabled = true;
@@ -496,10 +516,18 @@ async function handleRun(): Promise<void> {
         );
         await delay(STEP_DELAY);
       } else if (step.label === 'Continued fractions') {
-        appendStageBanner(
-          'Stage 3 — recovered the period r',
-          'the payoff — gcd(a^(r/2) ± 1, N) peels off the factors (see explainer 1 above)'
-        );
+        if (step.success) {
+          appendStageBanner(
+            'Stage 3 — recovered the period r',
+            'the payoff — gcd(a^(r/2) ± 1, N) peels off the factors (see explainer 1 above)'
+          );
+        } else {
+          appendStageBanner(
+            'Stage 3 — no convergent denominator satisfied a^r ≡ 1, so the period was NOT recovered',
+            'a fresh base a, and another order-finding attempt',
+            '↺'
+          );
+        }
         await delay(STEP_DELAY);
       }
     }
@@ -523,9 +551,17 @@ async function handleRun(): Promise<void> {
 
     // If N was resolved classically (even / perfect power / prime / too small),
     // no QFT visualization is produced — replace the "Computing…" placeholder.
+    //
+    // A Lucky GCD on the FIRST attempt lands here too, and it is not the same
+    // claim: nothing about N was resolved classically in the structural sense —
+    // a random base simply happened to share a factor with it, and re-running
+    // takes the quantum path. Saying "for this input" of a run-level accident
+    // was wrong for a third of N = 15 runs, the lab's own default.
     if (Object.keys(vizSections).length === 0) {
-      vizPanel.innerHTML =
-        '<p class="viz-panel__placeholder">N was resolved classically — no quantum order-finding was needed, so there is no QFT visualization for this input.</p>';
+      const lucky = collectedSteps.some((s) => s.label === 'Lucky GCD');
+      vizPanel.innerHTML = lucky
+        ? '<p class="viz-panel__placeholder">This run drew a base a that already shared a factor with N, so gcd(a, N) handed over a factor before any order-finding ran — there is no QFT visualization for <em>this run</em>. Press Run again for the quantum path.</p>'
+        : '<p class="viz-panel__placeholder">N was resolved classically — no quantum order-finding was needed, so there is no QFT visualization for this input.</p>';
     }
   } finally {
     // Only clear state if this run is still the current one; a newer run or a
@@ -537,14 +573,31 @@ async function handleRun(): Promise<void> {
   }
 }
 
-function updateCallout(N: bigint, factors: [bigint, bigint]): void {
-  liveCallout.innerHTML = `
-    <p>This demo factored <strong>N = ${N}</strong> → <strong>${factors[0]} × ${factors[1]}</strong> using Shor's algorithm.</p>
-    <p>Real RSA-2048: N has <strong>617 decimal digits</strong>. Same algorithm, same structure — just needs ~4,100 logical qubits.</p>
+const CALLOUT_LINKS = `
     <p class="live-callout__links">
       → <a href="https://systemslibrarian.github.io/crypto-lab-kyber-vault/" target="_blank" rel="noopener">crypto-lab-kyber-vault</a> — post-quantum replacement<br>
       → <a href="https://systemslibrarian.github.io/crypto-lab-bb84/" target="_blank" rel="noopener">crypto-lab-bb84</a> — physics-based alternative
     </p>`;
+
+/**
+ * Return the RSA-impact call-out to its shipped copy.
+ *
+ * `updateCallout` overwrites this panel with "This demo factored N = 143 →
+ * 11 × 13", and nothing ever took it back. Reset restored the step log, the
+ * viz panel and the live explainer to their placeholders while this panel kept
+ * asserting a factorisation the page no longer showed anywhere; and a following
+ * run of a prime (or of a different N that failed) left it naming the PREVIOUS
+ * run's N. So it is cleared at the start of every run and on Reset.
+ */
+function resetCallout(): void {
+  liveCallout.innerHTML = `
+    <p>Run the algorithm above to see a live demo.</p>${CALLOUT_LINKS}`;
+}
+
+function updateCallout(N: bigint, factors: [bigint, bigint]): void {
+  liveCallout.innerHTML = `
+    <p>This demo factored <strong>N = ${N}</strong> → <strong>${factors[0]} × ${factors[1]}</strong> using Shor's algorithm.</p>
+    <p>Real RSA-2048: N has <strong>617 decimal digits</strong>. Same algorithm, same structure — just needs ~4,100 logical qubits.</p>${CALLOUT_LINKS}`;
 }
 
 // ── Reset ────────────────────────────────────────────────────────────────
@@ -557,6 +610,7 @@ resetBtn.addEventListener('click', () => {
   vizAttempt = 0;
   lastA = null;
   resetAhaPeriod();
+  resetCallout();
   runBtn.disabled = false;
   setError('');
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
