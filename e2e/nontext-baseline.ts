@@ -18,7 +18,13 @@ export const NONTEXT_BASELINE: Record<
   { ratio: number; required: number; unverified: boolean }
 > = {
   "control-boundary|a.cl-btn": { ratio: 2.45, required: 3.0, unverified: false },
+  "control-boundary|button#preset-143.preset-btn": { ratio: 1.3, required: 3.0, unverified: false },
+  "control-boundary|button#preset-15.preset-btn": { ratio: 1.3, required: 3.0, unverified: false },
+  "control-boundary|button#preset-21.preset-btn": { ratio: 1.3, required: 3.0, unverified: false },
+  "control-boundary|button#preset-221.preset-btn": { ratio: 1.3, required: 3.0, unverified: false },
+  "control-boundary|button#preset-35.preset-btn": { ratio: 1.3, required: 3.0, unverified: false },
+  "control-boundary|button#preset-77.preset-btn": { ratio: 1.3, required: 3.0, unverified: false },
+  "control-boundary|button#preset-91.preset-btn": { ratio: 1.3, required: 3.0, unverified: false },
   "control-boundary|button#reset-btn.reset-btn": { ratio: 1.3, required: 3.0, unverified: false },
-  "control-boundary|button.phasor-freq-btn": { ratio: 1.3, required: 3.0, unverified: false },
-  "control-boundary|button.preset-btn": { ratio: 1.3, required: 3.0, unverified: false }
+  "control-boundary|button.phasor-freq-btn": { ratio: 1.3, required: 3.0, unverified: false }
 };
