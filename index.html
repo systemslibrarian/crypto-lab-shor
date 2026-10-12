@@ -356,37 +356,17 @@
               10<sup>34</sup> is plotted; the real gap is 25 orders of magnitude or more.</p>
             </div>
 
-            <h3 class="rsa-impact__section-title">RESOURCE REQUIREMENTS</h3>
-            <div class="resource-table-wrapper" tabindex="0" role="region" aria-label="Quantum resource requirements table for various cryptographic targets">
+            <h3 class="rsa-impact__section-title">Dated quantum resource estimates</h3>
+            <div class="resource-table-wrapper" tabindex="0" role="region" aria-label="Source-specific quantum resource estimates">
               <table class="resource-table">
-                <thead>
-                  <tr>
-                    <th>Target</th>
-                    <th>Logical Qubits</th>
-                    <th>Physical Qubits (est.)</th>
-                    <th>Threat Timeline</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Target and estimate</th><th>Logical qubits</th><th>Physical qubits</th><th>Estimated runtime</th></tr></thead>
                 <tbody>
-                  <tr class="row--broken">
-                    <td>RSA-512</td><td>~1,030</td><td>~500K</td><td>Already broken classically</td>
-                  </tr>
-                  <tr class="row--threat">
-                    <td>RSA-2048</td><td>~4,100</td><td>&lt;1M (Gidney, 2025)</td><td>10–25 years</td>
-                  </tr>
-                  <tr class="row--threat">
-                    <td>RSA-4096</td><td>~8,200</td><td>~2M</td><td>15–30 years</td>
-                  </tr>
-                  <tr class="row--threat">
-                    <td>ECC P-256</td><td>~2,330</td><td>&lt;500K (Google, 2026)</td><td>10–20 years</td>
-                  </tr>
-                  <tr class="row--threat">
-                    <td>ECC P-384</td><td>~3,500</td><td>~750K</td><td>15–25 years</td>
-                  </tr>
+                  <tr data-estimate="gidney-ekera-2019"><td>RSA-2048 — <a href="https://arxiv.org/abs/1905.09749">Gidney–Ekerå, 2019 preprint / 2021 publication</a></td><td>Separate circuit account; not taken from the 2025 estimate</td><td>20 million noisy qubits</td><td>8 hours</td></tr>
+                  <tr data-estimate="gidney-2025"><td>RSA-2048 — <a href="https://arxiv.org/html/2505.15917v1#S3.SS2">Gidney, 21 May 2025, §3.2</a></td><td>1,409 active; 1,537 including idle hot patches</td><td>897,864 before slack; approximately one million with safety slack</td><td>Less than one week</td></tr>
                 </tbody>
               </table>
-              <p class="resource-note">Largest verified error-corrected demonstration to date: 96 logical qubits (QuEra, Nature, Jan 2026) — and at far lower code distance than Shor needs<br>
-              Gap to RSA-2048: ~4,100 logical qubits needed</p>
+              <p class="resource-note">These are conditional resource estimates, not executed RSA-2048 attacks or dates for a future quantum computer. The 2025 design trades space for time using approximate residue arithmetic, yoked cold storage and magic-state cultivation. Both estimates assume nearest-neighbor connectivity, 0.1% uniform gate error, 1 μs surface-code cycles and 10 μs control reaction time. Logical and physical counts from different circuit designs must not be combined into one estimate.</p>
+              <p class="resource-note"><a href="https://www.nature.com/articles/s41586-025-09848-5">Neutral-atom architecture experiment (online 10 November 2025; January 2026 issue)</a>: the up-to-96-logical-qubit result is a postselected distance-4 cluster-state experiment (Fig. 6), distinct from the paper’s non-postselected surface-code QEC experiments. It is not a 96-qubit cryptanalytic computer, and its task, code distance and postselection prevent a simple qubit-count comparison with the factoring estimates.</p>
             </div>
 
             <details class="ecc-detail">

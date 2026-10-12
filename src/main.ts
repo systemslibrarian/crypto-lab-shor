@@ -597,7 +597,7 @@ function resetCallout(): void {
 function updateCallout(N: bigint, factors: [bigint, bigint]): void {
   liveCallout.innerHTML = `
     <p>This demo factored <strong>N = ${N}</strong> → <strong>${factors[0]} × ${factors[1]}</strong> using Shor's algorithm.</p>
-    <p>Real RSA-2048: N has <strong>617 decimal digits</strong>. Same algorithm, same structure — just needs ~4,100 logical qubits.</p>${CALLOUT_LINKS}`;
+    <p>Real RSA-2048: N has <strong>617 decimal digits</strong>. This browser simulation does not execute a quantum attack. Gidney’s 21 May 2025 resource estimate uses 1,409 active logical qubits (1,537 including idle hot patches), approximately one million noisy physical qubits with safety slack, and less than one week under specific hardware assumptions. See the dated resource table; this is not a universal minimum or a calendar forecast.</p>${CALLOUT_LINKS}`;
 }
 
 // ── Reset ────────────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ Beyond executing the steps, the demo is built to teach the two leaps that make S
 - **Understanding why RSA and ECC break** — the demo walks through the period-finding insight that connects modular arithmetic to quantum phase estimation, making the threat concrete rather than abstract.
 - **Teaching the QFT-to-period pipeline** — students can see the QFT probability distribution peaks, the continued fraction convergents, and the a^r ≡ 1 (mod N) verification step by step.
 - **Comparing classical vs. quantum factoring complexity** — the built-in RSA Impact panel shows the exponential-to-polynomial gap between GNFS and Shor for real key sizes.
-- **Motivating post-quantum migration** — the resource requirements table shows how close (or far) current quantum hardware is from breaking RSA-2048 and ECC P-256.
+- **Motivating post-quantum migration** — the dated resource table compares conditional RSA-2048 circuit estimates without assigning a Q-Day year.
 - **Do NOT use this as a real factoring tool** — the browser simulation handles N < 10,000; real quantum advantage requires fault-tolerant quantum hardware that does not yet exist at the required scale.
 
 ## Live Demo
@@ -84,3 +84,9 @@ reason. Uncaught page exceptions fail the run.
 *Part of the [Crypto Lab](https://crypto-lab.systemslibrarian.dev/) suite.*
 
 *"So whether you eat or drink or whatever you do, do it all for the glory of God." — 1 Corinthians 10:31*
+
+## Source-specific resource accounting
+
+[Gidney, 21 May 2025, §3.2](https://arxiv.org/html/2505.15917v1#S3.SS2) estimates RSA-2048 factoring using 1,409 active logical qubits, 1,537 including idle hot patches, and 897,864 physical qubits before safety slack (approximately one million with slack), in less than one week. Assumptions: nearest-neighbor connectivity, 0.1% uniform gate error, 1 μs surface-code cycles and 10 μs reaction time. The separate [Gidney–Ekerå 2019 estimate](https://arxiv.org/abs/1905.09749), published 2021, uses 20 million noisy qubits for eight hours. Neither is an executed attack or a calendar forecast. Unsourced scaling rows and fixed threat-year ranges have been removed rather than treated as measurements.
+
+The [neutral-atom experiment](https://www.nature.com/articles/s41586-025-09848-5), online 10 November 2025, January 2026 issue, reports an up-to-96-logical-qubit postselected distance-4 cluster experiment; its non-postselected surface-code QEC is a distinct experiment. That count is not a cryptanalytic machine or directly comparable to a factoring resource budget.
