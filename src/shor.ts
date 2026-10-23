@@ -5,8 +5,10 @@
  *
  * Order finding (the only step a real quantum computer performs) is simulated
  * classically: for the demo's range (N < 10,000) the true period r is found by
- * direct search, then the quantum measurement is modelled by sampling from the
- * ideal QFT probability distribution, which peaks at m = k·Q/r. Continued
+ * direct search, then the quantum measurement is modelled with the bounded
+ * peak-neighbourhood sampler documented in qft.ts. It covers all r peaks and
+ * samples offsets within ±4, rather than claiming an exact full-state QFT
+ * distribution. Continued
  * fractions then recover r from the sampled m — exactly the post-processing a
  * real Shor run performs. Every quantum step is clearly labelled as simulated.
  */
@@ -234,7 +236,7 @@ export async function runShor(
 
     emit({
       label: 'QFT distribution',
-      description: `(Simulated) Register Q = ${Q}; the distribution has ${r} equiprobable peaks at m = ${peakStr}${Number(r) > 48 ? ' (chart shows the first 48)' : ''}. Sampled measurement m = ${measuredM}, phase ${measuredM}/${Q}.`,
+      description: `(Bounded simulation) Register Q = ${Q}; the teaching sampler treats ${r} peak neighbourhoods at m = ${peakStr}${Number(r) > 48 ? ' (chart shows the first 48)' : ''} as equally likely and samples offsets within ±4. It is not the full Q-outcome distribution. Sampled m = ${measuredM}, phase ${measuredM}/${Q}.`,
       data: { distribution: distFor(measuredM), measured: measuredM, Q, r: Number(r) },
       success: true
     });

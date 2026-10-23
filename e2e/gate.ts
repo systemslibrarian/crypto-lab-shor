@@ -362,9 +362,13 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await scan(page, `${theme} / first paint`);
 
   // The skip link is parked off-screen until focused; the focused rendering is
-  // the state a keyboard visitor actually sees.
+  // the state a keyboard visitor actually sees. Activate it too: a visible
+  // skip link whose fragment target is absent is still a broken keyboard path.
   await page.locator('.cl-skip-link').focus();
   await scan(page, `${theme} / skip link focused`);
+  await page.locator('.cl-skip-link').press('Enter');
+  await expect(page).toHaveURL(/#app$/);
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe('app');
   await page.locator('#n-input').focus();
 
   // Invalid input: `#n-error` is `hidden` until this happens, and `#n-input`

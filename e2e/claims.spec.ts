@@ -332,6 +332,7 @@ test('qft chart: the peaks sit at k·Q/r, and exactly one bar is the measurement
     const sec = sections.nth(i);
     const title = flat(await sec.locator('.viz-section__title').first().innerText());
     expect(title).toContain('classically simulated');
+    expect(title).toContain('Windowed QFT probability shape');
     const Q = int(title, /Q = (\d+)/, 'register size');
     const r = int(title, /r = (\d+)/, 'period');
 
@@ -339,7 +340,8 @@ test('qft chart: the peaks sit at k·Q/r, and exactly one bar is the measurement
     await expect(chart).toHaveCount(1);
     const aria = (await chart.getAttribute('aria-label'))!;
     expect(int(aria, /multiples of Q\/r ≈ (\d+)/, 'peak spacing')).toBe(Math.round(Q / r));
-    const measured = int(aria, /sampled measurement was m = (\d+)/, 'sampled m');
+    expect(aria).toContain('bounded windows around the QFT probability peaks');
+    const measured = int(aria, /teaching sampler selected m = (\d+)/, 'sampled m');
 
     // The note under the chart names the same measurement.
     const note = flat(await sec.locator('div[style*="font-size"]').first().innerText());
