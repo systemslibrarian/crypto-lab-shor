@@ -169,13 +169,13 @@ function renderViz(step: ShorStep, N: bigint): void {
 
   if (step.label === 'QFT distribution') {
     const data = step.data as { distribution: Array<{m:number; probability:number; peak:boolean}>; measured: number; Q: number; r: number };
-    const sec = getVizSection(`qft-${vizAttempt}`, `QFT probability distribution  (classically simulated)  —  Q = ${data.Q},  r = ${data.r}`);
+    const sec = getVizSection(`qft-${vizAttempt}`, `Windowed QFT probability shape  (classically simulated)  —  Q = ${data.Q},  r = ${data.r}`);
     const wrapper = document.createElement('div');
     wrapper.className = 'qft-bars-wrapper';
     // Focusable so keyboard users can scroll the chart (WCAG 2.1.1).
     wrapper.setAttribute('role', 'img');
     wrapper.setAttribute('tabindex', '0');
-    wrapper.setAttribute('aria-label', `Bar chart of the QFT measurement probability distribution. It peaks at multiples of Q/r ≈ ${Math.round(data.Q / data.r)}. The sampled measurement was m = ${data.measured}.`);
+    wrapper.setAttribute('aria-label', `Bar chart of bounded windows around the QFT probability peaks. It peaks at multiples of Q/r ≈ ${Math.round(data.Q / data.r)}. The teaching sampler selected m = ${data.measured}.`);
     const barsDiv = document.createElement('div');
     barsDiv.className = 'qft-bars';
     const maxP = Math.max(...data.distribution.map(d => d.probability), 0.001);

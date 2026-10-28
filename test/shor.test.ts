@@ -63,10 +63,10 @@ test('large N within range is reliable (stress, 25 runs)', async () => {
   }
 });
 
-test('every continued-fraction step reports an r with a^r ≡ 1 mod N', async () => {
+test('every successful continued-fraction step reports an r with a^r ≡ 1 mod N', async () => {
   // Across many runs (some short-circuit via Lucky GCD and emit no CF step),
-  // whenever a Continued fractions step IS emitted, its chosen r must verify
-  // against the base a from that same attempt.
+  // every successful Continued fractions step must verify its chosen r against
+  // the base from that attempt, while a failed recovery must report no r.
   for (let i = 0; i < 40; i++) {
     const res = await runShor(247n, noop); // 13 * 19
     let a: bigint | null = null;
@@ -75,9 +75,14 @@ test('every continued-fraction step reports an r with a^r ≡ 1 mod N', async ()
         a = (s.data as { a?: bigint }).a ?? a;
       }
       if (s.label === 'Continued fractions') {
-        const { chosenR } = s.data as { chosenR: bigint };
+        const { chosenR } = s.data as { chosenR: bigint | null };
         assert.notEqual(a, null, 'a base must precede a Continued fractions step');
-        assert.equal(modPow(a!, chosenR, 247n), 1n, `a^r ≢ 1 mod N (a=${a}, r=${chosenR})`);
+        if (s.success) {
+          assert.notEqual(chosenR, null, 'a successful step must report its recovered period');
+          assert.equal(modPow(a!, chosenR!, 247n), 1n, `a^r ≢ 1 mod N (a=${a}, r=${chosenR})`);
+        } else {
+          assert.equal(chosenR, null, 'a failed recovery must not invent a period');
+        }
       }
     }
   }

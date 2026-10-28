@@ -9,7 +9,7 @@
  */
 
 /**
- * Compute the QFT measurement probability distribution for Shor's algorithm.
+ * Compute a windowed QFT probability shape for Shor's algorithm.
  *
  * For order r, register size Q = 2^(2L), and M = ⌊Q/r⌋ terms in the sum:
  *   P(m) = (1/(Q·M)) · |sin(π·M·m·r/Q)|² / |sin(π·m·r/Q)|²
@@ -17,14 +17,15 @@
  *
  * For large Q, we only compute near expected peaks (within ±4 of k·Q/r)
  * to keep computation tractable. When the order r is large we render only the
- * first `maxPeaks` peaks so the chart stays legible; the full distribution has
- * r equiprobable peaks. Returns at most 500 data points.
+ * first `maxPeaks` peak neighbourhoods so the chart stays legible. The returned
+ * points are normalized over those displayed windows, not over all Q outcomes.
+ * Returns at most 500 data points.
  *
  * This function is the CHART only. It is deliberately truncated, so it must not
  * be used to draw a measurement — sampling from a truncated prefix would make
  * every outcome land in the first `maxPeaks` peaks, which is not what a quantum
- * measurement does. Use `sampleQFTMeasurement(r, Q)` for that; it samples over
- * all r peaks.
+ * measurement does. Use `sampleQFTMeasurement(r, Q)` for the separate teaching
+ * sampler; it covers all r peak neighbourhoods within its documented window.
  *
  * (Classically simulated — not a real quantum measurement.)
  */
@@ -54,8 +55,7 @@ export function computeQFTDistribution(
    *   Otherwise: |Σ|² = sin²(π·M·alpha) / sin²(π·alpha) → P = that/(Q·M)
    *
    * The values returned below drop the constant 1/M factor (the shape is what
-   * the chart and the sampler need) and are renormalised over the sampled
-   * window before use.
+   * the chart needs) and are renormalised over the displayed windows.
    *
    * In practice for integer m, alpha is integer iff m*r ≡ 0 (mod Q).
    * We handle the limit explicitly to avoid 0/0.
@@ -118,22 +118,27 @@ function randomUnit(): number {
 }
 
 /**
- * Sample a measurement outcome m from the FULL QFT distribution for order r
- * and register size Q — all r peaks, not a truncated prefix.
+ * Sample a measurement outcome m from a bounded teaching approximation to the
+ * QFT distribution for order r and register size Q. The sampler covers all r
+ * peak neighbourhoods, unlike the chart's displayed prefix, but retains only
+ * offsets within ±win of the selected peak.
  *
- * The distribution is a comb of r equiprobable peaks at m ≈ k·Q/r for
- * k = 0 … r-1, each smeared by the Dirichlet kernel. So we sample in two
- * stages, which is exactly equivalent to sampling the joint distribution but
- * costs O(1) instead of O(Q):
+ * The teaching model is a comb of r peak neighbourhoods at m ≈ k·Q/r for
+ * k = 0 … r-1, each smeared by the Dirichlet kernel. We sample it in two
+ * stages, preserving the peak-selection lesson at O(1) cost instead of
+ * enumerating Q outcomes:
  *
- *   1. Draw k uniformly from {0, …, r-1}. (The peaks carry equal mass.)
+ *   1. Draw k uniformly from {0, …, r-1}. (The model assigns equal mass.)
  *   2. Draw the offset dm within ±WIN of that peak, weighted by the local
  *      Dirichlet-kernel shape.
  *
- * Which k you land on is the whole point of the post-processing step: when
- * gcd(k, r) > 1 the continued-fraction expansion recovers a proper divisor of
- * r rather than r itself, and the run has to be repeated. Sampling k uniformly
- * over the true range is what makes that failure rate come out right.
+ * This is not an exact full-distribution sampler: finite-Q probability outside
+ * the retained window is omitted, and the r peak neighbourhoods are treated as
+ * equally likely. Which k you land on is the whole point of the post-processing
+ * step: when gcd(k, r) > 1 the continued-fraction expansion recovers a proper divisor of
+ * r rather than r itself, and the run has to be repeated. Sampling across the
+ * full k range preserves that coprimality failure mode without pretending the
+ * bounded offset model is an exact quantum measurement.
  *
  * (Classically simulated — not a real quantum measurement.)
  */
