@@ -597,7 +597,7 @@ function resetCallout(): void {
 function updateCallout(N: bigint, factors: [bigint, bigint]): void {
   liveCallout.innerHTML = `
     <p>This demo factored <strong>N = ${N}</strong> → <strong>${factors[0]} × ${factors[1]}</strong> using Shor's algorithm.</p>
-    <p>Real RSA-2048: N has <strong>617 decimal digits</strong>. This browser simulation does not execute a quantum attack. Gidney’s 21 May 2025 resource estimate uses 1,409 active logical qubits (1,537 including idle hot patches), approximately one million noisy physical qubits with safety slack, and less than one week under specific hardware assumptions. See the dated resource table; this is not a universal minimum or a calendar forecast.</p>${CALLOUT_LINKS}`;
+    <p>Real RSA-2048: N has <strong>617 decimal digits</strong>. This browser simulation does not execute a quantum attack. Published resource estimates depend strongly on the proposed hardware: Gidney’s 2025 surface-code estimate is approximately one million physical qubits in less than a week, while a 2026 cat-qubit preprint estimates about 23,000 cat qubits in 3.14 days under different assumptions, including no bit flips in that configuration. See the dated resource table; neither estimate is a hardware demonstration or a calendar forecast.</p>${CALLOUT_LINKS}`;
 }
 
 // ── Reset ────────────────────────────────────────────────────────────────

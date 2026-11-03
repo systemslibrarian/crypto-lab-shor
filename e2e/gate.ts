@@ -117,9 +117,13 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
 
   await expect(page.locator('#run-btn')).toBeVisible();
   await expect(page.locator('#step-log')).not.toBeEmpty();
-  await expect(page.locator('.resource-table tbody tr')).toHaveCount(2);
+  await expect(page.locator('.resource-table tbody tr')).toHaveCount(3);
   await expect(page.locator('[data-estimate="gidney-2025"]')).toContainText('1,409 active; 1,537');
   await expect(page.locator('[data-estimate="gidney-2025"]')).not.toContainText('4,100');
+  await expect(page.locator('[data-estimate="pappalardo-2026"] a')).toHaveAttribute('href', 'https://eprint.iacr.org/2026/2665');
+  await expect(page.locator('[data-estimate="pappalardo-2026"]')).toContainText('cat qubits');
+  await expect(page.locator('[data-estimate="pappalardo-2026"]')).toContainText('3.14 days');
+  await expect(page.locator('.resource-note').first()).toContainText('no bit flips');
 
   await settle(page);
   await expectNotBlank(page, `${theme} first paint`);
