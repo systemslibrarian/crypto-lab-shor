@@ -2,7 +2,7 @@
 
 ## What It Is
 
-Shor's algorithm (Peter Shor, 1994) is a quantum algorithm that factors integers in polynomial time O((log N)³), rendering RSA, ECC, and all discrete-logarithm-based cryptosystems insecure against a sufficiently large quantum computer. This demo models the complete teaching pipeline — classical pre-checks, modular exponentiation period finding, a windowed Quantum Fourier Transform probability shape, continued fraction extraction, and GCD-based factor recovery — entirely in the browser with no backends. The QFT sampler covers all `r` peak neighbourhoods but keeps only offsets within ±4 and treats those neighbourhoods as equally likely; it is an explicitly bounded classical approximation, not a full-state quantum simulation. The security model it breaks is asymmetric public-key cryptography; it does not threaten symmetric ciphers or hash functions beyond Grover's quadratic speedup.
+Shor's algorithm (Peter Shor, 1994) is a quantum algorithm that factors integers in polynomial time O((log N)³), rendering RSA, ECC, and all discrete-logarithm-based cryptosystems insecure against a sufficiently large quantum computer. This demo models the complete teaching pipeline — classical pre-checks, modular exponentiation period finding, a windowed Quantum Fourier Transform probability shape, continued fraction extraction, and GCD-based factor recovery — entirely in the browser with no backends. The QFT sampler covers all `r` peak neighbourhoods but keeps only offsets within ±4 and treats those neighbourhoods as equally likely; it is an explicitly bounded classical approximation: the demo holds no quantum state at any point, full or partial. The security model it breaks is asymmetric public-key cryptography; it does not threaten symmetric ciphers or hash functions beyond Grover's quadratic speedup.
 
 Beyond executing the steps, the demo is built to teach the two leaps that make Shor click: **why knowing the period `r` factors `N`** (an always-visible explainer walks `aʳ ≡ 1 → (a^(r/2)−1)(a^(r/2)+1) ≡ 0 → gcd(a^(r/2)±1, N)`, with the actual numbers from your run substituted in), and **why the QFT concentrates probability at multiples of `Q/r`** (animated *phasor wheels* draw the rotating phase of each comb entry so you can watch them constructively add at `k·Q/r` and cancel elsewhere — the real interference `|Σ eⁱᶲ|²`, not a pre-plotted curve). Every quantum step is labelled **(classically simulated)** so a browser demo can teach a quantum algorithm without ever implying real quantum speedup.
 
@@ -31,10 +31,10 @@ Enter any composite integer N (4–9999), pick a preset, or type your own. Press
 
 ## What Can Go Wrong
 
-- Period finding fails when the random base `a` shares a factor with N, or when the recovered period `r` is odd or yields a^(r/2) ≡ -1 (mod N) — these cases produce only trivial factors and force a restart with a new base.
+- Period finding fails when the recovered period `r` is odd or yields a^(r/2) ≡ -1 (mod N) — those cases produce only trivial factors and force a restart with a new base. A random base `a` that happens to share a factor with N is the opposite: gcd(a, N) is already a non-trivial factor, so the run succeeds there and then with no quantum step at all (the step log calls it "Lucky GCD").
 - The QFT measurement is probabilistic: a run can land on a peak that does not reveal the true period, so several runs may be needed.
 - Continued-fraction convergents can return a divisor of the period rather than the period itself, which is why the a^r ≡ 1 (mod N) check is required before trusting a result.
-- The simulation classically tracks the full state, so it only scales to small N (the demo caps at N < 10,000) — it is not a quantum computer.
+- The simulation never holds a quantum state at all: it finds the period by direct classical search and then samples the bounded closed-form QFT peak model described above, which is why it only reaches small N (the demo caps at N < 10,000) — it is not a quantum computer.
 - Misreading the threat scope: Shor breaks factoring and discrete log (RSA, ECC, classical DH) but not symmetric ciphers or hashes beyond Grover's quadratic speedup.
 
 ## Real-World Usage
